@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  manager
+  facteur
+}
+
+enum StatutCollecte {
+  conforme
+  hors_marge
+  incident
+  manquant
+}
+
+enum StatutTournee {
+  planifiee
+  en_cours
+  terminee
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  nom       String
+  prenom    String
+  email     String   @unique
+  password  String
+  role      Role     @default(facteur)
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  collectes        Collecte[]
+  tournees         Tournee[]
+  clientsDefaut    Client[]   @relation("FacteurDefaut")
+}
+
+model Client {
+  id              Int      @id @default(autoincrement())
+  nom             String
+  adresse         String
+  codePostal      String
+  ville           String
+  qrCode          String   @unique
+  joursCollecte   Int[]    // 1=Lundi, 2=Mardi, ..., 7=Dimanche (ISO)
+  heureDebut      String   // "HH:MM"
+  heureFin        String   // "HH:MM"
+  margeMinutes    Int      @default(15)
+  facteurDefautId Int?
+  facteurDefaut   User?    @relation("FacteurDefaut", fields: [facteurDefautId], references: [id])
+  actif           Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  collectes       Collecte[]
+  tourneesClients TourneeClient[]
+}
+
+model Collecte {
+  id            Int            @id @default(autoincrement())
+  clientId      Int
+  client        Client         @relation(fields: [clientId], references: [id])
+  facteurId     Int
+  facteur       User           @relation(fields: [facteurId], references: [id])
+  dateCollecte  DateTime       @db.Date
+  heureCollecte DateTime
+  statut        StatutCollecte @default(conforme)
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  photos        Photo[]
+  alertes       Alerte[]
+}
+
+model Photo {
+  id         Int      @id @default(autoincrement())
+  collecteId Int
+  collecte   Collecte @relation(fields: [collecteId], references: [id], onDelete: Cascade)
+  filename   String
+  createdAt  DateTime @default(now())
+}
+
+model Alerte {
+  id         Int      @id @default(autoincrement())
+  collecteId Int?
+  collecte   Collecte? @relation(fields: [collecteId], references: [id])
+  type       String   // "hors_marge", "incident", "manquant"
+  message    String
+  traitee    Boolean  @default(false)
+  emailEnvoye Boolean @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Tournee {
+  id        Int           @id @default(autoincrement())
+  facteurId Int
+  facteur   User          @relation(fields: [facteurId], references: [id])
+  date      DateTime      @db.Date
+  statut    StatutTournee @default(planifiee)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  clients   TourneeClient[]
+}
+
+model TourneeClient {
+  id        Int     @id @default(autoincrement())
+  tourneeId Int
+  tournee   Tournee @relation(fields: [tourneeId], references: [id], onDelete: Cascade)
+  clientId  Int
+  client    Client  @relation(fields: [clientId], references: [id])
+  ordre     Int     @default(0)
+  scanne    Boolean @default(false)
+}
+
+model Parametre {
+  id          Int      @id @default(autoincrement())
+  cle         String   @unique
+  valeur      String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
