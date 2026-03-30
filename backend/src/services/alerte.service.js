@@ -22,13 +22,20 @@ async function envoyerEmail(sujet, corps) {
   if (actif !== 'true') return;
 
   const dest = await getParam('alerte_email_dest');
-  if (!dest) return;
+  if (!dest || !dest.trim()) return;
+
+  // Supporte plusieurs adresses séparées par des virgules ou des points-virgules
+  const destinataires = dest
+    .split(/[,;]/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (destinataires.length === 0) return;
 
   try {
     const transporter = getTransporter();
     await transporter.sendMail({
       from: process.env.SMTP_FROM || 'Collect&Track <noreply@collectandtrack.fr>',
-      to: dest,
+      to: destinataires.join(', '),
       subject: `[Collect&Track] ${sujet}`,
       html: corps,
     });

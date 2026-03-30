@@ -4,67 +4,64 @@ import { Html5Qrcode } from 'html5-qrcode';
 import Layout from '../../components/Layout';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
+import t from '../../styles/theme';
+
+const STATUT_CONFIG = {
+  conforme:   { bg: t.successBg,  border: t.successBorder,  color: t.success,  icon: '✓', label: 'Conforme'       },
+  hors_marge: { bg: t.warningBg,  border: t.warningBorder,  color: t.warning,  icon: '!', label: 'Hors plage horaire' },
+  incident:   { bg: t.dangerBg,   border: t.dangerBorder,   color: t.danger,   icon: '✕', label: 'Incident détecté' },
+};
 
 export default function ScanPage() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
-  const scannerRef = useRef(null);
+  const navigate  = useNavigate();
   const html5QrRef = useRef(null);
 
-  const [scanning, setScanning] = useState(false);
-  const [result, setResult] = useState(null); // { statut, message, collecte }
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [facteurs, setFacteurs] = useState([]);
-  const [facteurSelectionne, setFacteurSelectionne] = useState('');
-  const [defaultFacteurId, setDefaultFacteurId] = useState(null);
+  const [scanning,  setScanning]  = useState(false);
+  const [result,    setResult]    = useState(null);
+  const [error,     setError]     = useState('');
+  const [loading,   setLoading]   = useState(false);
+  const [facteurs,  setFacteurs]  = useState([]);
+  const [facteurId, setFacteurId] = useState('');
+  const [defaultId, setDefaultId] = useState(null);
 
   useEffect(() => {
-    // Charger la liste des facteurs et le paramètre facteur_defaut_id
     const init = async () => {
       try {
         const [usersRes, paramsRes] = await Promise.all([
           api.get('/admin/users'),
           api.get('/admin/parametres'),
         ]);
-        const facteursList = usersRes.data.filter((u) => u.role === 'facteur' && u.actif);
-        setFacteurs(facteursList);
-
+        const list = usersRes.data.filter((u) => u.role === 'facteur' && u.actif);
+        setFacteurs(list);
         const defParam = paramsRes.data.find((p) => p.cle === 'facteur_defaut_id');
         const defId = defParam?.valeur ? parseInt(defParam.valeur) : null;
-        setDefaultFacteurId(defId);
-
-        // Pré-sélection : facteur par défaut, sinon le facteur connecté si role facteur
-        if (defId && facteursList.find((f) => f.id === defId)) {
-          setFacteurSelectionne(String(defId));
+        setDefaultId(defId);
+        if (defId && list.find((f) => f.id === defId)) {
+          setFacteurId(String(defId));
         } else if (user?.role === 'facteur') {
-          setFacteurSelectionne(String(user.id));
+          setFacteurId(String(user.id));
         }
       } catch {
-        // Non bloquant — si pas accès admin, on utilise l'utilisateur courant
-        if (user?.role === 'facteur') {
-          setFacteurSelectionne(String(user.id));
-        }
+        if (user?.role === 'facteur') setFacteurId(String(user.id));
       }
     };
     init();
   }, []);
 
   const startScanner = async () => {
-    setResult(null);
-    setError('');
+    setResult(null); setError('');
     setScanning(true);
-
     try {
       html5QrRef.current = new Html5Qrcode('qr-reader');
       await html5QrRef.current.start(
         { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
         onScanSuccess,
         () => {}
       );
     } catch (e) {
-      setError("Impossible d'accéder à la caméra : " + e.message);
+      setError("Impossible d'accéder à la caméra.");
       setScanning(false);
     }
   };
@@ -77,13 +74,13 @@ export default function ScanPage() {
     setScanning(false);
   };
 
-  const onScanSuccess = async (decodedText) => {
+  const onScanSuccess = async (code) => {
     await stopScanner();
     setLoading(true);
     try {
       const { data } = await api.post('/collectes/scan', {
-        qrCode: decodedText,
-        facteurId: facteurSelectionne || undefined,
+        qrCode: code,
+        facteurId: facteurId || undefined,
       });
       setResult(data);
     } catch (e) {
@@ -93,140 +90,174 @@ export default function ScanPage() {
     }
   };
 
-  const couleurStatut = {
-    conforme: { bg: '#dcfce7', border: '#22c55e', color: '#166534' },
-    hors_marge: { bg: '#fff7ed', border: '#f97316', color: '#9a3412' },
-    incident: { bg: '#fef2f2', border: '#ef4444', color: '#991b1b' },
-  };
+  const cfg = result ? (STATUT_CONFIG[result.statut] || STATUT_CONFIG.conforme) : null;
 
   return (
-    <Layout title="Scanner un QR Code">
-      <div style={{ maxWidth: 480, margin: '0 auto' }}>
+    <Layout title="Scanner une collecte">
+      <div style={{ maxWidth: 480, margin: '0 auto', fontFamily: t.fontFamily }}>
 
-        {/* Sélection facteur */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-          <label style={{ fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
-            Facteur effectuant la collecte
-          </label>
+        {/* ── Sélection facteur ── */}
+        <div style={card}>
+          <label style={sectionLabel}>Facteur effectuant la collecte</label>
           {facteurs.length > 0 ? (
             <select
-              value={facteurSelectionne}
-              onChange={(e) => setFacteurSelectionne(e.target.value)}
-              style={{ width: '100%', height: 48, padding: '0 12px', border: '2px solid #e2e8f0', borderRadius: 8, fontSize: 15 }}
+              value={facteurId}
+              onChange={(e) => setFacteurId(e.target.value)}
+              style={selectStyle}
             >
-              <option value="">-- Sélectionner un facteur --</option>
+              <option value="">— Sélectionner —</option>
               {facteurs.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.prenom} {f.nom}
-                  {f.id === defaultFacteurId ? ' (défaut)' : ''}
+                  {f.prenom} {f.nom}{f.id === defaultId ? ' ★' : ''}
                 </option>
               ))}
             </select>
           ) : (
-            <div style={{ color: '#64748b', fontSize: 14 }}>
-              {user?.role === 'facteur' ? `${user.prenom} ${user.nom} (vous)` : 'Chargement...'}
+            <div style={{ color: t.textSecondary, fontSize: 14, padding: '8px 0' }}>
+              {user?.role === 'facteur' ? `${user.prenom} ${user.nom}` : 'Chargement…'}
             </div>
           )}
         </div>
 
-        {/* Zone scanner */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: 16 }}>
-          <div id="qr-reader" style={{ width: '100%', borderRadius: 8, overflow: 'hidden', minHeight: scanning ? 280 : 0 }} />
+        {/* ── Zone scanner ── */}
+        <div style={card}>
+          {/* Viewfinder QR */}
+          <div
+            id="qr-reader"
+            style={{
+              width: '100%',
+              borderRadius: t.radiusMd,
+              overflow: 'hidden',
+              minHeight: scanning ? 300 : 0,
+              background: '#000',
+            }}
+          />
 
-          {!scanning && !result && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: 64, marginBottom: 12 }}>📷</div>
-              <p style={{ color: '#64748b', marginBottom: 20 }}>Positionnez le QR code dans le cadre</p>
-              <button
-                onClick={startScanner}
-                disabled={loading}
-                style={{
-                  width: '100%', height: 56, background: '#1d4ed8', color: '#fff',
-                  border: 'none', borderRadius: 12, fontSize: 18, fontWeight: 700,
-                  cursor: 'pointer', boxShadow: '0 4px 14px rgba(29,78,216,0.4)',
-                }}
-              >
-                📷 Démarrer le scan
+          {!scanning && !result && !loading && (
+            <div style={{ textAlign: 'center', padding: '28px 0 8px' }}>
+              {/* Illustration cadre QR */}
+              <div style={{
+                width: 100, height: 100, margin: '0 auto 16px',
+                borderRadius: t.radiusLg,
+                background: t.primaryBg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={t.primary} strokeWidth="1.5">
+                  <rect x="3" y="3" width="5" height="5" rx="1"/>
+                  <rect x="16" y="3" width="5" height="5" rx="1"/>
+                  <rect x="3" y="16" width="5" height="5" rx="1"/>
+                  <path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
+                  <path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/>
+                  <path d="M3 12h.01"/><path d="M12 3h.01"/>
+                </svg>
+              </div>
+              <p style={{ color: t.textMuted, fontSize: 14, marginBottom: 20 }}>
+                Pointez la caméra vers le QR Code du client
+              </p>
+              <button onClick={startScanner} style={btnPrimary}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8 }}>
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Démarrer le scan
               </button>
             </div>
           )}
 
           {scanning && (
-            <button
-              onClick={stopScanner}
-              style={{
-                width: '100%', height: 48, marginTop: 12, background: '#ef4444', color: '#fff',
-                border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              Annuler
-            </button>
+            <>
+              <p style={{ textAlign: 'center', color: t.textMuted, fontSize: 13, margin: '12px 0 8px' }}>
+                Cadrez le QR Code dans le viseur…
+              </p>
+              <button onClick={stopScanner} style={btnDanger}>Annuler</button>
+            </>
           )}
 
           {loading && (
-            <div style={{ textAlign: 'center', padding: 20, color: '#1d4ed8', fontWeight: 600 }}>
-              Enregistrement en cours...
+            <div style={{ textAlign: 'center', padding: 24 }}>
+              <div style={{ color: t.primary, fontWeight: 600, fontSize: 15 }}>Enregistrement…</div>
             </div>
           )}
         </div>
 
-        {/* Résultat */}
-        {result && (() => {
-          const s = couleurStatut[result.statut] || couleurStatut.conforme;
-          return (
-            <div style={{
-              background: s.bg, border: `2px solid ${s.border}`, borderRadius: 12,
-              padding: 20, marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 40, textAlign: 'center', marginBottom: 8 }}>
-                {result.statut === 'conforme' ? '✅' : result.statut === 'hors_marge' ? '⚠️' : '🚨'}
+        {/* ── Résultat ── */}
+        {result && cfg && (
+          <div style={{
+            background: cfg.bg,
+            border: `2px solid ${cfg.border}`,
+            borderRadius: t.radiusLg,
+            padding: 20,
+            marginBottom: 12,
+          }}>
+            {/* Badge statut */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                background: cfg.color, color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, fontWeight: 700,
+              }}>
+                {cfg.icon}
               </div>
-              <div style={{ fontWeight: 700, fontSize: 18, color: s.color, textAlign: 'center', marginBottom: 8 }}>
-                {result.message}
-              </div>
-              <div style={{ color: '#374151', fontSize: 14 }}>
-                <div><b>Client :</b> {result.collecte?.client?.nom}</div>
-                <div><b>Adresse :</b> {result.collecte?.client?.adresse}, {result.collecte?.client?.ville}</div>
-                <div><b>Heure :</b> {new Date(result.collecte?.heureCollecte).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                <button
-                  onClick={() => { setResult(null); setError(''); }}
-                  style={{
-                    flex: 1, height: 48, background: '#1d4ed8', color: '#fff',
-                    border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                  }}
-                >
-                  Nouveau scan
-                </button>
-                {result.statut !== 'incident' && (
-                  <button
-                    onClick={() => navigate(`/incident/${result.collecte.id}`)}
-                    style={{
-                      flex: 1, height: 48, background: '#ef4444', color: '#fff',
-                      border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    Signaler incident
-                  </button>
-                )}
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 17, color: cfg.color }}>{cfg.label}</div>
+                <div style={{ fontSize: 13, color: t.textSecondary }}>
+                  {new Date(result.collecte?.heureCollecte).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
             </div>
-          );
-        })()}
 
-        {/* Erreur */}
+            {/* Infos client */}
+            <div style={{
+              background: 'rgba(255,255,255,0.6)',
+              borderRadius: t.radiusMd,
+              padding: '12px 14px',
+              marginBottom: 16,
+              fontSize: 14,
+            }}>
+              <div style={{ fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>
+                {result.collecte?.client?.nom}
+              </div>
+              <div style={{ color: t.textSecondary }}>
+                {result.collecte?.client?.adresse}, {result.collecte?.client?.ville}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { setResult(null); setError(''); }}
+                style={{ ...btnSecondary, flex: 1 }}
+              >
+                Nouveau scan
+              </button>
+              {result.statut !== 'incident' && (
+                <button
+                  onClick={() => navigate(`/incident/${result.collecte.id}`)}
+                  style={{ ...btnDanger, flex: 1 }}
+                >
+                  Signaler incident
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Erreur ── */}
         {error && (
           <div style={{
-            background: '#fef2f2', border: '2px solid #ef4444', borderRadius: 12,
-            padding: 16, color: '#991b1b', fontWeight: 600,
+            background: t.dangerBg,
+            border: `2px solid ${t.dangerBorder}`,
+            borderRadius: t.radiusLg,
+            padding: 16,
+            color: t.danger,
+            fontWeight: 600,
+            fontSize: 14,
           }}>
-            ❌ {error}
+            {error}
             <button
               onClick={() => setError('')}
-              style={{ display: 'block', marginTop: 10, background: '#ef4444', color: '#fff',
-                border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontSize: 14 }}
+              style={{ display: 'block', marginTop: 10, ...btnDanger }}
             >
               Fermer
             </button>
@@ -236,3 +267,37 @@ export default function ScanPage() {
     </Layout>
   );
 }
+
+const card = {
+  background: '#fff',
+  borderRadius: t.radiusLg,
+  padding: 16,
+  marginBottom: 14,
+  boxShadow: t.shadowCard,
+  border: `1px solid ${t.border}`,
+};
+const sectionLabel = {
+  display: 'block', fontSize: 12, fontWeight: 700,
+  color: t.textMuted, letterSpacing: '0.6px',
+  textTransform: 'uppercase', marginBottom: 10,
+};
+const selectStyle = {
+  width: '100%', height: 48, padding: '0 12px',
+  border: `1.5px solid ${t.border}`,
+  borderRadius: t.radiusMd, fontSize: 15,
+  color: t.textPrimary, background: '#fff',
+  outline: 'none', appearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237A9484' strokeWidth='1.5' fill='none' strokeLinecap='round'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 14px center',
+  paddingRight: 40,
+};
+const btnBase = {
+  height: 50, border: 'none', borderRadius: t.radiusMd,
+  fontSize: 15, fontWeight: 700, cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: '100%', transition: 'opacity 0.15s',
+};
+const btnPrimary  = { ...btnBase, background: t.primary,    color: '#fff', boxShadow: `0 4px 12px ${t.primary}44` };
+const btnSecondary= { ...btnBase, background: t.primaryBg,  color: t.primary, border: `1.5px solid ${t.primaryBorder}` };
+const btnDanger   = { ...btnBase, background: t.danger,     color: '#fff' };

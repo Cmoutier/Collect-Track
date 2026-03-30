@@ -1,5 +1,4 @@
 const QRCode = require('qrcode');
-const { v4: uuidv4 } = require('crypto');
 
 /**
  * Génère un identifiant unique pour le QR code d'un client

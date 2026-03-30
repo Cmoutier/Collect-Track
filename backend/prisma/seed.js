@@ -10,7 +10,7 @@ async function main() {
   const parametres = [
     { cle: 'marge_defaut_minutes', valeur: '15', description: 'Marge horaire par défaut en minutes avant/après la plage de collecte' },
     { cle: 'alerte_email_active', valeur: 'true', description: 'Activer les alertes par email' },
-    { cle: 'alerte_email_dest', valeur: process.env.ALERTE_EMAIL_DEST || 'manager@example.com', description: 'Email destinataire des alertes' },
+    { cle: 'alerte_email_dest', valeur: process.env.ALERTE_EMAIL_DEST || 'manager@example.com', description: 'Destinataires des alertes (plusieurs adresses séparées par des virgules)' },
     { cle: 'alerte_hors_marge', valeur: 'true', description: 'Envoyer une alerte pour les collectes hors marge' },
     { cle: 'alerte_incident', valeur: 'true', description: 'Envoyer une alerte pour les incidents' },
     { cle: 'alerte_manquant', valeur: 'true', description: 'Envoyer une alerte pour les collectes manquantes' },

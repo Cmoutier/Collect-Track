@@ -11,7 +11,13 @@ async function getParam(cle) {
 async function envoyerRapportJournalier() {
   try {
     const dest = await getParam('alerte_email_dest');
-    if (!dest) return;
+    if (!dest || !dest.trim()) return;
+
+    const destinataires = dest
+      .split(/[,;]/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (destinataires.length === 0) return;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -51,7 +57,7 @@ async function envoyerRapportJournalier() {
 
     await transporter.sendMail({
       from: process.env.SMTP_FROM || 'Collect&Track <noreply@collectandtrack.fr>',
-      to: dest,
+      to: destinataires.join(', '),
       subject: `[Collect&Track] Rapport du ${yesterday.toLocaleDateString('fr-FR')}`,
       html,
     });
