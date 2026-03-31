@@ -90,14 +90,16 @@ model Photo {
 }
 
 model Alerte {
-  id         Int      @id @default(autoincrement())
-  collecteId Int?
-  collecte   Collecte? @relation(fields: [collecteId], references: [id])
-  type       String   // "hors_marge", "incident", "manquant"
-  message    String
-  traitee    Boolean  @default(false)
-  emailEnvoye Boolean @default(false)
-  createdAt  DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  collecteId  Int?
+  collecte    Collecte? @relation(fields: [collecteId], references: [id])
+  type        String    // "hors_marge", "incident", "manquant"
+  message     String
+  traitee     Boolean   @default(false)
+  resolution  String?   // commentaire du manager lors du traitement
+  emailEnvoye Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  traiteeAt   DateTime?
 }
 
 model Tournee {

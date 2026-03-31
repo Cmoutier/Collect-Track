@@ -17,13 +17,15 @@ export default function ScanPage() {
   const navigate  = useNavigate();
   const html5QrRef = useRef(null);
 
-  const [scanning,  setScanning]  = useState(false);
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [facteurs,  setFacteurs]  = useState([]);
-  const [facteurId, setFacteurId] = useState('');
-  const [defaultId, setDefaultId] = useState(null);
+  const [scanning,     setScanning]     = useState(false);
+  const [result,       setResult]       = useState(null);
+  const [error,        setError]        = useState('');
+  const [loading,      setLoading]      = useState(false);
+  const [facteurs,     setFacteurs]     = useState([]);
+  const [facteurId,    setFacteurId]    = useState('');
+  const [defaultId,    setDefaultId]    = useState(null);
+  const [pendingCode,  setPendingCode]  = useState(null);  // QR code détecté, en attente de confirmation
+  const [doublonInfo,  setDoublonInfo]  = useState(null);  // { clientNom, heureExistante, code } si doublon
 
   useEffect(() => {
     const init = async () => {
@@ -74,17 +76,31 @@ export default function ScanPage() {
     setScanning(false);
   };
 
+  // Appelé par html5-qrcode quand un QR est détecté : on pause et on attend confirmation
   const onScanSuccess = async (code) => {
     await stopScanner();
+    setPendingCode(code);
+  };
+
+  // Confirmer le scan (après la pause, ou après confirmation doublon)
+  const confirmerScan = async (code, force = false) => {
+    setPendingCode(null);
+    setDoublonInfo(null);
     setLoading(true);
     try {
       const { data } = await api.post('/collectes/scan', {
         qrCode: code,
         facteurId: facteurId || undefined,
+        ...(force ? { force: true } : {}),
       });
       setResult(data);
     } catch (e) {
-      setError(e.response?.data?.error || 'Erreur lors du scan');
+      if (e.response?.status === 409 && e.response?.data?.alreadyScanned) {
+        // Doublon : on demande confirmation
+        setDoublonInfo({ ...e.response.data, code });
+      } else {
+        setError(e.response?.data?.error || 'Erreur lors du scan');
+      }
     } finally {
       setLoading(false);
     }
@@ -173,6 +189,43 @@ export default function ScanPage() {
             </>
           )}
 
+          {/* ── QR détecté : attente confirmation ── */}
+          {pendingCode && !loading && (
+            <div style={{ textAlign: 'center', padding: '20px 8px 8px' }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: t.secondaryBg, margin: '0 auto 14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={t.secondary} strokeWidth="2">
+                  <rect x="3" y="3" width="5" height="5" rx="1"/><rect x="16" y="3" width="5" height="5" rx="1"/>
+                  <rect x="3" y="16" width="5" height="5" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
+                  <path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/>
+                </svg>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: t.textPrimary, marginBottom: 4 }}>
+                QR Code détecté
+              </div>
+              <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 20 }}>
+                Confirmez pour enregistrer le passage
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => { setPendingCode(null); }}
+                  style={{ ...btnSecondary, flex: 1 }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => confirmerScan(pendingCode)}
+                  style={{ ...btnPrimary, flex: 1 }}
+                >
+                  Confirmer le scan
+                </button>
+              </div>
+            </div>
+          )}
+
           {loading && (
             <div style={{ textAlign: 'center', padding: 24 }}>
               <div style={{ color: t.primary, fontWeight: 600, fontSize: 15 }}>Enregistrement…</div>
@@ -239,6 +292,48 @@ export default function ScanPage() {
                   Signaler incident
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Dialog doublon ── */}
+        {doublonInfo && (
+          <div style={{
+            background: t.warningBg,
+            border: `2px solid ${t.warningBorder}`,
+            borderRadius: t.radiusLg,
+            padding: 20, marginBottom: 12,
+          }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 14 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                background: t.warning, color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, fontWeight: 700,
+              }}>!</div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: t.warning }}>
+                  Déjà scanné aujourd'hui
+                </div>
+                <div style={{ fontSize: 13, color: t.textSecondary, marginTop: 4 }}>
+                  <strong>{doublonInfo.clientNom}</strong> a déjà été scanné à{' '}
+                  <strong>{doublonInfo.heureExistante}</strong>. Voulez-vous quand même enregistrer ce passage ?
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setDoublonInfo(null)}
+                style={{ ...btnSecondary, flex: 1 }}
+              >
+                Non, annuler
+              </button>
+              <button
+                onClick={() => confirmerScan(doublonInfo.code, true)}
+                style={{ ...btnBase, flex: 1, background: t.warning, color: '#fff' }}
+              >
+                Oui, enregistrer
+              </button>
             </div>
           </div>
         )}

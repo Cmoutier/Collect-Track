@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../api/axios';
 import useAuthStore from '../../store/useAuthStore';
 import t from '../../styles/theme';
 
-function StatCard({ label, value, color, bgColor, sub, icon }) {
+function StatCard({ label, value, color, bgColor, sub, icon, onClick }) {
   return (
-    <div style={{
-      background: '#fff', borderRadius: t.radiusLg, padding: '16px 18px',
-      boxShadow: t.shadowCard, border: `1px solid ${t.border}`,
-      borderLeft: `4px solid ${color}`,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: '#fff', borderRadius: t.radiusLg, padding: '16px 18px',
+        boxShadow: t.shadowCard, border: `1px solid ${t.border}`,
+        borderLeft: `4px solid ${color}`,
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'box-shadow 0.15s, transform 0.1s',
+      }}
+      onMouseEnter={(e) => { if (onClick) { e.currentTarget.style.boxShadow = t.shadowMd; e.currentTarget.style.transform = 'translateY(-1px)'; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = t.shadowCard; e.currentTarget.style.transform = 'none'; }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 6 }}>
@@ -57,10 +64,14 @@ function AlerteBadge({ type }) {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
-  const [stats,     setStats]     = useState(null);
-  const [alertes,   setAlertes]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [exporting, setExporting] = useState(false);
+  const navigate = useNavigate();
+  const [stats,          setStats]          = useState(null);
+  const [alertes,        setAlertes]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [exporting,      setExporting]      = useState(false);
+  const [alerteATraiter, setAlerteATraiter] = useState(null);  // alerte en cours de traitement
+  const [resolution,     setResolution]     = useState('');
+  const [traitant,       setTraitant]       = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -70,9 +81,21 @@ export default function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const traiterAlerte = async (id) => {
-    await api.put(`/dashboard/alertes/${id}/traiter`);
-    setAlertes((prev) => prev.filter((a) => a.id !== id));
+  const ouvrirModalTraiter = (alerte) => {
+    setAlerteATraiter(alerte);
+    setResolution('');
+  };
+
+  const confirmerTraitement = async () => {
+    if (!alerteATraiter) return;
+    setTraitant(true);
+    try {
+      await api.put(`/dashboard/alertes/${alerteATraiter.id}/traiter`, { resolution });
+      setAlertes((prev) => prev.filter((a) => a.id !== alerteATraiter.id));
+      setAlerteATraiter(null);
+    } finally {
+      setTraitant(false);
+    }
   };
 
   const handleExport = async () => {
@@ -140,23 +163,27 @@ export default function DashboardPage() {
               label="Total"  value={stats.total}
               color={t.secondary} bgColor={t.secondaryBg}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.secondary} strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>}
+              onClick={() => navigate('/historique')}
             />
             <StatCard
               label="Conformes" value={stats.conformes}
               color={t.success} bgColor={t.successBg}
               sub={stats.tauxConformite !== null ? `${stats.tauxConformite}%` : null}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.success} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>}
+              onClick={() => navigate('/historique?statut=conforme')}
             />
             <StatCard
               label="Hors marge" value={stats.horsMarge}
               color={t.warning} bgColor={t.warningBg}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.warning} strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}
+              onClick={() => navigate('/historique?statut=hors_marge')}
             />
             <StatCard
               label="Incidents" value={stats.incidents}
               color={t.danger} bgColor={t.dangerBg}
               sub={stats.alertesActives > 0 ? `${stats.alertesActives} alerte${stats.alertesActives > 1 ? 's' : ''}` : null}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.danger} strokeWidth="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
+              onClick={() => navigate('/historique?statut=incident')}
             />
           </div>
         )}
@@ -265,7 +292,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => traiterAlerte(a.id)}
+                    onClick={() => ouvrirModalTraiter(a)}
                     style={{
                       height: 30, padding: '0 10px',
                       background: '#fff', border: `1.5px solid ${t.border}`,
@@ -277,6 +304,82 @@ export default function DashboardPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal traitement alerte ── */}
+        {alerteATraiter && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+            onClick={(e) => { if (e.target === e.currentTarget) setAlerteATraiter(null); }}
+          >
+            <div style={{
+              background: '#fff', borderRadius: t.radiusXl,
+              padding: 24, width: '100%', maxWidth: 440,
+              boxShadow: t.shadowLg,
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: t.textPrimary, marginBottom: 6 }}>
+                Traiter l'alerte
+              </div>
+              <div style={{
+                fontSize: 13, color: t.textSecondary,
+                background: t.bgPage, borderRadius: t.radiusMd,
+                padding: '10px 14px', marginBottom: 16,
+                borderLeft: `3px solid ${alerteATraiter.type === 'incident' ? t.danger : t.warning}`,
+              }}>
+                {alerteATraiter.message}
+              </div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: t.textMuted, marginBottom: 6 }}>
+                Commentaire de résolution (optionnel)
+              </label>
+              <textarea
+                value={resolution}
+                onChange={(e) => setResolution(e.target.value)}
+                placeholder="Décrivez comment l'incident a été résolu, la cause, les actions prises…"
+                rows={4}
+                style={{
+                  width: '100%', padding: '10px 12px',
+                  border: `1.5px solid ${t.border}`,
+                  borderRadius: t.radiusMd, fontSize: 13,
+                  color: t.textPrimary, resize: 'vertical',
+                  outline: 'none', boxSizing: 'border-box',
+                  fontFamily: t.fontFamily,
+                }}
+                onFocus={(e) => e.target.style.borderColor = t.primary}
+                onBlur={(e) => e.target.style.borderColor = t.border}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button
+                  onClick={() => setAlerteATraiter(null)}
+                  style={{
+                    flex: 1, height: 44, background: t.bgPage,
+                    border: `1.5px solid ${t.border}`,
+                    borderRadius: t.radiusMd, fontSize: 14, fontWeight: 600,
+                    color: t.textSecondary, cursor: 'pointer',
+                  }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmerTraitement}
+                  disabled={traitant}
+                  style={{
+                    flex: 1, height: 44,
+                    background: traitant ? t.primaryLight : t.primary,
+                    border: 'none', borderRadius: t.radiusMd,
+                    fontSize: 14, fontWeight: 700, color: '#fff',
+                    cursor: traitant ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {traitant ? 'Enregistrement…' : 'Marquer comme traité'}
+                </button>
+              </div>
             </div>
           </div>
         )}

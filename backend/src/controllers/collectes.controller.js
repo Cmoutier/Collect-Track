@@ -27,6 +27,22 @@ exports.scan = async (req, res) => {
       });
     }
 
+    // Vérifier si déjà scanné aujourd'hui (même client, même jour)
+    const dejaScanne = await prisma.collecte.findFirst({
+      where: { clientId: client.id, dateCollecte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
+    });
+    if (dejaScanne && !req.body.force) {
+      const heureExistante = new Date(dejaScanne.heureCollecte).toLocaleTimeString('fr-FR', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris',
+      });
+      return res.status(409).json({
+        alreadyScanned: true,
+        clientNom: client.nom,
+        heureExistante,
+        error: `${client.nom} a déjà été scanné aujourd'hui à ${heureExistante}`,
+      });
+    }
+
     // Déterminer le facteur
     const idFacteur = facteurId ? parseInt(facteurId) : (client.facteurDefautId || req.user.id);
     const facteurExiste = await prisma.user.findFirst({
@@ -122,6 +138,18 @@ exports.uploadPhotos = async (req, res) => {
     );
 
     res.json({ photos });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+};
+
+exports.supprimer = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const collecte = await prisma.collecte.findUnique({ where: { id } });
+    if (!collecte) return res.status(404).json({ error: 'Collecte introuvable' });
+    await prisma.collecte.delete({ where: { id } });
+    res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

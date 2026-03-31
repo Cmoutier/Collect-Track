@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../api/axios';
 import t from '../../styles/theme';
@@ -18,12 +19,20 @@ const STATUT_STYLE = {
 };
 
 export default function HistoriquePage() {
-  const [collectes,  setCollectes]  = useState([]);
-  const [total,      setTotal]      = useState(0);
-  const [page,       setPage]       = useState(1);
-  const [loading,    setLoading]    = useState(false);
-  const [exporting,  setExporting]  = useState(false);
-  const [filters,    setFilters]    = useState({ statut: '', dateDebut: '', dateFin: '', search: '' });
+  const [searchParams] = useSearchParams();
+  const [collectes,       setCollectes]       = useState([]);
+  const [total,           setTotal]           = useState(0);
+  const [page,            setPage]            = useState(1);
+  const [loading,         setLoading]         = useState(false);
+  const [exporting,       setExporting]       = useState(false);
+  const [suppressionId,   setSuppressionId]   = useState(null);  // id en cours de suppression
+  const [supprimant,      setSupprimant]       = useState(false);
+  const [filters,    setFilters]    = useState({
+    statut:    searchParams.get('statut')    || '',
+    dateDebut: searchParams.get('dateDebut') || '',
+    dateFin:   searchParams.get('dateFin')   || '',
+    search:    searchParams.get('search')    || '',
+  });
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -66,6 +75,21 @@ export default function HistoriquePage() {
       URL.revokeObjectURL(url);
     } catch { alert('Erreur lors de l\'export Excel'); }
     finally { setExporting(false); }
+  };
+
+  const supprimerCollecte = async () => {
+    if (!suppressionId) return;
+    setSupprimant(true);
+    try {
+      await api.delete(`/collectes/${suppressionId}`);
+      setCollectes((prev) => prev.filter((c) => c.id !== suppressionId));
+      setTotal((prev) => prev - 1);
+      setSuppressionId(null);
+    } catch {
+      alert('Erreur lors de la suppression');
+    } finally {
+      setSupprimant(false);
+    }
   };
 
   const totalPages = Math.ceil(total / 20);
@@ -155,51 +179,77 @@ export default function HistoriquePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {collectes.map((c) => {
               const st = STATUT_STYLE[c.statut] || STATUT_STYLE.conforme;
+              const alerteTraitee = c.alertes?.find((a) => a.traitee && a.resolution);
               return (
                 <div key={c.id} style={{
                   background: '#fff', borderRadius: t.radiusLg,
                   padding: '12px 14px',
                   boxShadow: t.shadowCard, border: `1px solid ${t.border}`,
-                  display: 'flex', gap: 12, alignItems: 'center',
                 }}>
-                  {/* Dot statut */}
-                  <div style={{
-                    width: 10, height: 10, borderRadius: '50%',
-                    background: st.dot, flexShrink: 0,
-                    boxShadow: `0 0 0 3px ${st.bg}`,
-                  }} />
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {/* Dot statut */}
+                    <div style={{
+                      width: 10, height: 10, borderRadius: '50%',
+                      background: st.dot, flexShrink: 0,
+                      boxShadow: `0 0 0 3px ${st.bg}`,
+                    }} />
 
-                  {/* Infos */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {c.client.nom}
-                    </div>
-                    <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                      {c.facteur.prenom} {c.facteur.nom}
-                      {' · '}
-                      {new Date(c.heureCollecte).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                    {c.notes && (
-                      <div style={{ fontSize: 11, color: t.textMuted, marginTop: 3, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {c.notes}
+                    {/* Infos */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: t.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.client.nom}
                       </div>
-                    )}
+                      <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+                        {c.facteur.prenom} {c.facteur.nom}
+                        {' · '}
+                        {new Date(c.heureCollecte).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {c.notes && (
+                        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 3, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.notes}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Droite : statut + date + supprimer */}
+                    <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700,
+                        color: st.color, background: st.bg,
+                        padding: '2px 8px', borderRadius: t.radiusFull,
+                      }}>
+                        {st.label}
+                      </span>
+                      <span style={{ fontSize: 11, color: t.textMuted }}>
+                        {new Date(c.dateCollecte).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                      <button
+                        onClick={() => setSuppressionId(c.id)}
+                        title="Supprimer cette collecte"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: t.textMuted, padding: 2, lineHeight: 1,
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Droite : statut + date */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <span style={{
-                      fontSize: 11, fontWeight: 700,
-                      color: st.color, background: st.bg,
-                      padding: '2px 8px', borderRadius: t.radiusFull,
-                      display: 'block', marginBottom: 4,
+                  {/* Note de résolution */}
+                  {alerteTraitee && (
+                    <div style={{
+                      marginTop: 10, padding: '8px 12px',
+                      background: t.successBg, borderRadius: t.radiusMd,
+                      borderLeft: `3px solid ${t.success}`,
+                      fontSize: 12, color: t.textSecondary,
                     }}>
-                      {st.label}
-                    </span>
-                    <span style={{ fontSize: 11, color: t.textMuted }}>
-                      {new Date(c.dateCollecte).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
-                    </span>
-                  </div>
+                      <span style={{ fontWeight: 700, color: t.success }}>Résolution · </span>
+                      {alerteTraitee.resolution}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -228,6 +278,56 @@ export default function HistoriquePage() {
             </button>
           </div>
         )}
+      {/* ── Modal confirmation suppression ── */}
+      {suppressionId && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 20,
+        }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSuppressionId(null); }}
+        >
+          <div style={{
+            background: '#fff', borderRadius: t.radiusXl,
+            padding: 24, width: '100%', maxWidth: 380,
+            boxShadow: t.shadowLg,
+          }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: t.textPrimary, marginBottom: 8 }}>
+              Supprimer ce scan ?
+            </div>
+            <div style={{ fontSize: 13, color: t.textSecondary, marginBottom: 20 }}>
+              Cette collecte sera définitivement supprimée. Cette action est irréversible.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setSuppressionId(null)}
+                style={{
+                  flex: 1, height: 44, background: t.bgPage,
+                  border: `1.5px solid ${t.border}`,
+                  borderRadius: t.radiusMd, fontSize: 14, fontWeight: 600,
+                  color: t.textSecondary, cursor: 'pointer',
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={supprimerCollecte}
+                disabled={supprimant}
+                style={{
+                  flex: 1, height: 44,
+                  background: supprimant ? '#f87171' : t.danger,
+                  border: 'none', borderRadius: t.radiusMd,
+                  fontSize: 14, fontWeight: 700, color: '#fff',
+                  cursor: supprimant ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {supprimant ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </Layout>
   );

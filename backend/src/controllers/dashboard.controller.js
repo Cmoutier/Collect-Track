@@ -70,6 +70,7 @@ exports.historique = async (req, res) => {
           client: { select: { nom: true, adresse: true, ville: true } },
           facteur: { select: { nom: true, prenom: true } },
           photos: { select: { id: true, filename: true } },
+          alertes: { select: { id: true, type: true, resolution: true, traitee: true, traiteeAt: true } },
         },
       }),
       prisma.collecte.count({ where }),
@@ -113,9 +114,14 @@ exports.alertes = async (req, res) => {
 exports.traiterAlerte = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const { resolution } = req.body;
     const alerte = await prisma.alerte.update({
       where: { id },
-      data: { traitee: true },
+      data: {
+        traitee: true,
+        traiteeAt: new Date(),
+        ...(resolution ? { resolution: resolution.trim() } : {}),
+      },
     });
     res.json(alerte);
   } catch (e) {

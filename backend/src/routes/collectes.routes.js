@@ -26,6 +26,9 @@ router.post('/:id/photos', auth, upload.array('photos', 5), ctrl.uploadPhotos);
 // Liste des collectes (manager/admin)
 router.get('/', auth, role('manager', 'admin'), ctrl.liste);
 
+// Supprimer une collecte (manager/admin)
+router.delete('/:id', auth, role('manager', 'admin'), ctrl.supprimer);
+
 // Détail d'une collecte
 router.get('/:id', auth, role('manager', 'admin'), ctrl.detail);
 
