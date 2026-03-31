@@ -55,9 +55,6 @@ export default function Login() {
               alt="STEP POST"
               style={{ height: 72, marginBottom: 16, objectFit: 'contain' }}
             />
-            <div style={{ fontWeight: 800, fontSize: 22, color: t.textPrimary, letterSpacing: '-0.3px' }}>
-              STEP POST
-            </div>
             <div style={{ fontSize: 13, color: t.textMuted, marginTop: 4 }}>
               Collect&amp;Track — Traçabilité des collectes
             </div>
