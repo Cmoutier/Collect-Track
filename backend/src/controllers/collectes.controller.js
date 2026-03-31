@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { calculerStatut, estJourCollecte } = require('../services/conformite.service');
+const { calculerStatut, estJourCollecte, heureEnMinutesParis } = require('../services/conformite.service');
 const alerteService = require('../services/alerte.service');
 
 const prisma = new PrismaClient();
@@ -86,6 +86,10 @@ exports.scan = async (req, res) => {
       data: { scanne: true },
     });
 
+    // Info de debug horaire (aide au diagnostic)
+    const hScanMin = heureEnMinutesParis(now);
+    const hScanStr = `${String(Math.floor(hScanMin / 60)).padStart(2, '0')}:${String(hScanMin % 60).padStart(2, '0')}`;
+
     res.json({
       collecte,
       statut,
@@ -94,6 +98,12 @@ exports.scan = async (req, res) => {
         : statut === 'hors_marge'
         ? 'Collecte hors plage horaire'
         : 'Incident détecté',
+      horaire: {
+        heureScan:   hScanStr,
+        heureDebut:  client.heureDebut,
+        heureFin:    client.heureFin,
+        marge:       client.margeMinutes,
+      },
     });
   } catch (e) {
     console.error(e);
@@ -138,6 +148,22 @@ exports.uploadPhotos = async (req, res) => {
     );
 
     res.json({ photos });
+  } catch (e) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+};
+
+exports.clientPreview = async (req, res) => {
+  try {
+    const { qrCode } = req.query;
+    if (!qrCode) return res.status(400).json({ error: 'QR Code manquant' });
+    const client = await prisma.client.findUnique({
+      where: { qrCode },
+      select: { id: true, nom: true, adresse: true, ville: true, heureDebut: true, heureFin: true, margeMinutes: true, actif: true },
+    });
+    if (!client) return res.status(404).json({ error: 'Client introuvable' });
+    if (!client.actif) return res.status(400).json({ error: 'Client inactif' });
+    res.json(client);
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

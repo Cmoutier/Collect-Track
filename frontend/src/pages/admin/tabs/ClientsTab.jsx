@@ -64,12 +64,40 @@ export default function ClientsTab() {
   const downloadQR = async (c) => {
     try {
       const response = await api.get(`/admin/clients/${c.id}/qrcode`, { responseType: 'blob' });
-      const url  = URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href  = url;
-      link.download = `qr-${c.nom.replace(/\s+/g, '_')}.png`;
-      link.click();
-      URL.revokeObjectURL(url);
+      const imgUrl = URL.createObjectURL(response.data);
+
+      const img = new Image();
+      img.onload = () => {
+        const labelHeight = 56;
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.width;
+        canvas.height = img.height + labelHeight;
+        const ctx = canvas.getContext('2d');
+
+        // Fond blanc
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // QR Code
+        ctx.drawImage(img, 0, 0);
+
+        // Nom du client centré en dessous
+        ctx.fillStyle = '#000000';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 22px Arial, sans-serif';
+        ctx.fillText(c.nom, canvas.width / 2, img.height + 36);
+
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `qr-${c.nom.replace(/\s+/g, '_')}.png`;
+          link.click();
+          URL.revokeObjectURL(url);
+        });
+        URL.revokeObjectURL(imgUrl);
+      };
+      img.src = imgUrl;
     } catch { alert('Erreur lors du téléchargement du QR Code'); }
   };
 
