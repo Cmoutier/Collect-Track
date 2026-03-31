@@ -189,7 +189,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── Taux conformité ── */}
-        {stats?.tauxConformite !== null && (
+        {stats && stats.tauxConformite !== null && (
           <div style={{
             background: '#fff', borderRadius: t.radiusLg,
             padding: '14px 18px', marginBottom: 16,

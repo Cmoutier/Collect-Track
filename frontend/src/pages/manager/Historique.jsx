@@ -179,7 +179,12 @@ export default function HistoriquePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {collectes.map((c) => {
               const st = STATUT_STYLE[c.statut] || STATUT_STYLE.conforme;
-              const alerteTraitee = c.alertes?.find((a) => a.traitee && a.resolution);
+              const resolution = c.notes?.includes('Résolution :')
+                ? c.notes.split('Résolution :').pop().trim()
+                : null;
+              const notesFacteur = c.notes?.includes('Résolution :')
+                ? c.notes.split('\n\nRésolution :')[0].trim() || null
+                : c.notes;
               return (
                 <div key={c.id} style={{
                   background: '#fff', borderRadius: t.radiusLg,
@@ -204,9 +209,9 @@ export default function HistoriquePage() {
                         {' · '}
                         {new Date(c.heureCollecte).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </div>
-                      {c.notes && (
+                      {notesFacteur && (
                         <div style={{ fontSize: 11, color: t.textMuted, marginTop: 3, fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.notes}
+                          {notesFacteur}
                         </div>
                       )}
                     </div>
@@ -239,7 +244,7 @@ export default function HistoriquePage() {
                   </div>
 
                   {/* Note de résolution */}
-                  {alerteTraitee && (
+                  {resolution && (
                     <div style={{
                       marginTop: 10, padding: '8px 12px',
                       background: t.successBg, borderRadius: t.radiusMd,
@@ -247,7 +252,7 @@ export default function HistoriquePage() {
                       fontSize: 12, color: t.textSecondary,
                     }}>
                       <span style={{ fontWeight: 700, color: t.success }}>Résolution · </span>
-                      {alerteTraitee.resolution}
+                      {resolution}
                     </div>
                   )}
                 </div>
