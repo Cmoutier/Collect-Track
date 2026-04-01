@@ -239,30 +239,40 @@ exports.detail = async (req, res) => {
 exports.tourneeAujourdhui = async (req, res) => {
   try {
     const facteurId = req.user.id;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Chercher une tournée planifiée ou en cours
-    let tournee = await prisma.tournee.findFirst({
-      where: { facteurId, date: today, statut: { in: ['planifiee', 'en_cours'] } },
-      include: {
-        clients: {
-          include: { client: { select: { id: true, nom: true, adresse: true, ville: true, qrCode: true, heureDebut: true, heureFin: true } } },
-          orderBy: { ordre: 'asc' },
-        },
+    // Jour ISO Paris pour filtrer les jours de collecte
+    const { jourISOParis } = require('../services/conformite.service');
+    const jourISO = jourISOParis(now);
+
+    // Clients du facteur prévus aujourd'hui, triés par ordre
+    const clients = await prisma.client.findMany({
+      where: {
+        facteurDefautId: facteurId,
+        actif: true,
+        OR: [
+          { joursCollecte: { isEmpty: true } },
+          { joursCollecte: { has: jourISO } },
+        ],
       },
+      select: { id: true, nom: true, adresse: true, ville: true, qrCode: true, heureDebut: true, heureFin: true, margeMinutes: true, joursCollecte: true, ordre: true },
+      orderBy: { ordre: 'asc' },
     });
 
-    // Si pas de tournée, retourner les clients du facteur par défaut
-    if (!tournee) {
-      const clients = await prisma.client.findMany({
-        where: { facteurDefautId: facteurId, actif: true },
-        select: { id: true, nom: true, adresse: true, ville: true, qrCode: true, heureDebut: true, heureFin: true, joursCollecte: true },
-      });
-      return res.json({ tournee: null, clients });
-    }
+    // Pour chaque client, vérifier s'il a été scanné aujourd'hui
+    const clientsAvecStatut = await Promise.all(
+      clients.map(async (c) => {
+        const collecte = await prisma.collecte.findFirst({
+          where: { clientId: c.id, dateCollecte: today },
+          select: { id: true, statut: true, heureCollecte: true },
+          orderBy: { heureCollecte: 'desc' },
+        });
+        return { ...c, collecteToday: collecte || null };
+      })
+    );
 
-    res.json({ tournee, clients: tournee.clients.map((tc) => ({ ...tc.client, scanne: tc.scanne, ordre: tc.ordre })) });
+    res.json({ clients: clientsAvecStatut });
   } catch (e) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

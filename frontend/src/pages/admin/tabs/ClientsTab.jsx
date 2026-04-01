@@ -61,6 +61,22 @@ export default function ClientsTab() {
     fetchAll();
   };
 
+  const moveClient = async (index, direction) => {
+    const sorted = [...filtered].sort((a, b) => a.ordre - b.ordre || a.nom.localeCompare(b.nom));
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+    const a = sorted[index];
+    const b = sorted[targetIndex];
+    // On échange les ordres (ou on utilise les positions si égaux)
+    const ordreA = index;
+    const ordreB = targetIndex;
+    await Promise.all([
+      api.put(`/admin/clients/${a.id}`, { ordre: ordreB }),
+      api.put(`/admin/clients/${b.id}`, { ordre: ordreA }),
+    ]);
+    fetchAll();
+  };
+
   const downloadQR = async (c) => {
     try {
       const response = await api.get(`/admin/clients/${c.id}/qrcode`, { responseType: 'blob' });
@@ -101,9 +117,9 @@ export default function ClientsTab() {
     } catch { alert('Erreur lors du téléchargement du QR Code'); }
   };
 
-  const filtered = clients.filter((c) =>
-    !search || c.nom.toLowerCase().includes(search.toLowerCase()) || c.ville.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = clients
+    .filter((c) => !search || c.nom.toLowerCase().includes(search.toLowerCase()) || c.ville.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => a.ordre - b.ordre || a.nom.localeCompare(b.nom));
 
   return (
     <div style={{ fontFamily: t.fontFamily }}>
@@ -123,41 +139,60 @@ export default function ClientsTab() {
         <div style={{ textAlign: 'center', padding: 32, color: t.textMuted }}>Chargement…</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((c) => (
+          {filtered.map((c, index) => (
             <div key={c.id} style={{
               background: '#fff', borderRadius: t.radiusLg, padding: '14px 16px',
               boxShadow: t.shadowCard, border: `1px solid ${t.border}`,
               opacity: c.actif ? 1 : 0.5,
+              display: 'flex', gap: 10, alignItems: 'stretch',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                {/* Infos */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: t.textPrimary }}>{c.nom}</div>
-                  <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                    {c.adresse}, {c.codePostal} {c.ville}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                    <span style={pill(t.primary)}>
-                      {c.heureDebut} – {c.heureFin} · ±{c.margeMinutes}min
-                    </span>
-                    <span style={pill(t.secondary)}>
-                      {c.joursCollecte.map((j) => JOURS_LABELS[j]).join(' ')}
-                    </span>
-                    {c.facteurDefaut && (
-                      <span style={pill(t.textMuted)}>
-                        {c.facteurDefaut.prenom} {c.facteurDefaut.nom}
-                      </span>
-                    )}
-                  </div>
+              {/* Boutons ordre */}
+              {!search && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center', flexShrink: 0 }}>
+                  <button
+                    onClick={() => moveClient(index, -1)}
+                    disabled={index === 0}
+                    title="Monter"
+                    style={{ ...btnOrdre, opacity: index === 0 ? 0.2 : 1 }}
+                  >▲</button>
+                  <span style={{ fontSize: 10, color: t.textMuted, textAlign: 'center', lineHeight: 1 }}>{index + 1}</span>
+                  <button
+                    onClick={() => moveClient(index, 1)}
+                    disabled={index === filtered.length - 1}
+                    title="Descendre"
+                    style={{ ...btnOrdre, opacity: index === filtered.length - 1 ? 0.2 : 1 }}
+                  >▼</button>
                 </div>
-                {/* Actions */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-                  <button onClick={() => openEdit(c)} style={btnSm}>Éditer</button>
-                  <button onClick={() => downloadQR(c)} style={{ ...btnSm, color: t.secondary }}>QR Code</button>
-                  <button onClick={() => handleToggle(c)} style={{ ...btnSm, color: c.actif ? t.danger : t.success }}>
-                    {c.actif ? 'Désactiver' : 'Activer'}
-                  </button>
+              )}
+
+              {/* Infos */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: t.textPrimary }}>{c.nom}</div>
+                <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+                  {c.adresse}, {c.codePostal} {c.ville}
                 </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span style={pill(t.primary)}>
+                    {c.heureDebut} – {c.heureFin} · ±{c.margeMinutes}min
+                  </span>
+                  <span style={pill(t.secondary)}>
+                    {c.joursCollecte.map((j) => JOURS_LABELS[j]).join(' ')}
+                  </span>
+                  {c.facteurDefaut && (
+                    <span style={pill(t.textMuted)}>
+                      {c.facteurDefaut.prenom} {c.facteurDefaut.nom}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+                <button onClick={() => openEdit(c)} style={btnSm}>Éditer</button>
+                <button onClick={() => downloadQR(c)} style={{ ...btnSm, color: t.secondary }}>QR Code</button>
+                <button onClick={() => handleToggle(c)} style={{ ...btnSm, color: c.actif ? t.danger : t.success }}>
+                  {c.actif ? 'Désactiver' : 'Activer'}
+                </button>
               </div>
             </div>
           ))}
@@ -248,6 +283,7 @@ function Field({ label, children }) {
   );
 }
 
+const btnOrdre = { background: 'none', border: 'none', cursor: 'pointer', color: t.textMuted, fontSize: 10, padding: '2px 4px', lineHeight: 1 };
 const pill = (color) => ({
   fontSize: 11, fontWeight: 600, color,
   background: color + '14',

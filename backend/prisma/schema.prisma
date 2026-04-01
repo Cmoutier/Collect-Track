@@ -56,6 +56,7 @@ model Client {
   facteurDefautId Int?
   facteurDefaut   User?    @relation("FacteurDefaut", fields: [facteurDefautId], references: [id])
   actif           Boolean  @default(true)
+  ordre           Int      @default(0)
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

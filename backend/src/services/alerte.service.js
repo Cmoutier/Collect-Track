@@ -81,42 +81,70 @@ async function creerAlerte(collecte, type) {
 
 async function verifierCollectesManquantes() {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const jourISO = today.getDay() === 0 ? 7 : today.getDay();
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const jourISO = now.getDay() === 0 ? 7 : now.getDay();
 
-    // Clients actifs dont aujourd'hui est un jour de collecte
+    const paramManquant = await getParam('alerte_manquant');
+    if (paramManquant === 'false') return;
+
+    // Clients actifs prévus aujourd'hui
     const clients = await prisma.client.findMany({
       where: {
         actif: true,
-        joursCollecte: { has: jourISO },
+        OR: [
+          { joursCollecte: { isEmpty: true } },
+          { joursCollecte: { has: jourISO } },
+        ],
       },
+      orderBy: { ordre: 'asc' },
     });
 
+    // Identifier ceux sans collecte aujourd'hui
+    const manquants = [];
     for (const client of clients) {
-      // Vérifier si une collecte existe aujourd'hui
       const collecte = await prisma.collecte.findFirst({
         where: { clientId: client.id, dateCollecte: today },
       });
+      if (!collecte) manquants.push(client);
+    }
 
-      if (!collecte) {
-        // Créer une alerte manquant
-        const already = await prisma.alerte.findFirst({
-          where: {
-            type: 'manquant',
-            message: { contains: `Client #${client.id}` },
-            createdAt: { gte: today },
-          },
+    if (manquants.length === 0) return;
+
+    // Créer une alerte en base par client manquant (pour le dashboard)
+    for (const client of manquants) {
+      const already = await prisma.alerte.findFirst({
+        where: { type: 'manquant', message: { contains: client.nom }, createdAt: { gte: today } },
+      });
+      if (!already) {
+        await prisma.alerte.create({
+          data: { type: 'manquant', message: `Collecte manquante — ${client.nom} (attendue aujourd'hui)` },
         });
-        if (!already) {
-          await creerAlerte(
-            { id: null, clientId: client.id, facteurId: null, heureCollecte: new Date(),
-              client: { nom: client.nom }, facteur: null },
-            'manquant'
-          );
-        }
       }
     }
+
+    // Envoyer UN seul email récapitulatif
+    const heure = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+    const lignes = manquants.map((c) =>
+      `<tr><td style="padding:6px 12px;border-bottom:1px solid #eee">${c.nom}</td><td style="padding:6px 12px;border-bottom:1px solid #eee;color:#666">${c.heureDebut} – ${c.heureFin}</td></tr>`
+    ).join('');
+
+    await envoyerEmail(
+      `${manquants.length} collecte(s) non effectuée(s) à ${heure}`,
+      `<div style="font-family:Arial,sans-serif;max-width:600px">
+        <h2 style="color:#2B6E44">Collectes non effectuées</h2>
+        <p>Le <strong>${dateStr}</strong> à <strong>${heure}</strong>, ${manquants.length} client(s) n'ont pas été scannés :</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <thead><tr style="background:#f5f5f5">
+            <th style="padding:8px 12px;text-align:left">Client</th>
+            <th style="padding:8px 12px;text-align:left">Plage horaire</th>
+          </tr></thead>
+          <tbody>${lignes}</tbody>
+        </table>
+        <p style="color:#999;font-size:12px">Collect&amp;Track — Rapport automatique</p>
+      </div>`
+    );
   } catch (e) {
     console.error('[Alerte] Erreur vérif manquants:', e.message);
   }

@@ -24,10 +24,18 @@ export default function ScanPage() {
   const [facteurs,     setFacteurs]     = useState([]);
   const [facteurId,    setFacteurId]    = useState('');
   const [defaultId,    setDefaultId]    = useState(null);
-  const [pendingCode,   setPendingCode]  = useState(null);   // QR code détecté, en attente de confirmation
-  const [pendingClient, setPendingClient] = useState(null);  // infos client récupérées au preview
+  const [pendingCode,    setPendingCode]    = useState(null);
+  const [pendingClient,  setPendingClient]  = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [doublonInfo,  setDoublonInfo]  = useState(null);   // { clientNom, heureExistante, code } si doublon
+  const [doublonInfo,    setDoublonInfo]    = useState(null);
+  const [clientsJour,    setClientsJour]    = useState([]);
+
+  const fetchClientsJour = async () => {
+    try {
+      const { data } = await api.get('/collectes/tournee/today');
+      setClientsJour(data.clients || []);
+    } catch {}
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -51,6 +59,7 @@ export default function ScanPage() {
       }
     };
     init();
+    fetchClientsJour();
   }, []);
 
   const startScanner = async () => {
@@ -108,6 +117,7 @@ export default function ScanPage() {
         ...(force ? { force: true } : {}),
       });
       setResult(data);
+      fetchClientsJour(); // Rafraîchir la liste après scan
     } catch (e) {
       if (e.response?.status === 409 && e.response?.data?.alreadyScanned) {
         // Doublon : on demande confirmation
@@ -421,6 +431,77 @@ export default function ScanPage() {
             >
               Fermer
             </button>
+          </div>
+        )}
+
+        {/* ── Liste chronologique du jour ── */}
+        {clientsJour.length > 0 && (
+          <div style={{ ...card, padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: 12 }}>
+              Tournée du jour — {clientsJour.filter((c) => c.collecteToday).length}/{clientsJour.length} effectué(s)
+            </div>
+
+            {/* Barre de progression */}
+            <div style={{ background: t.border, borderRadius: t.radiusFull, height: 6, marginBottom: 14, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.round((clientsJour.filter((c) => c.collecteToday).length / clientsJour.length) * 100)}%`,
+                height: '100%', borderRadius: t.radiusFull,
+                background: `linear-gradient(90deg, ${t.primary}, ${t.primaryLight})`,
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {clientsJour.map((c, i) => {
+                const collecte = c.collecteToday;
+                const statutCfg = collecte ? {
+                  conforme:   { color: t.success,  bg: t.successBg,  dot: '#22C55E', label: '✓' },
+                  hors_marge: { color: t.warning,  bg: t.warningBg,  dot: '#F59E0B', label: '!' },
+                  incident:   { color: t.danger,   bg: t.dangerBg,   dot: '#EF4444', label: '✕' },
+                }[collecte.statut] : null;
+
+                return (
+                  <div key={c.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px',
+                    background: collecte ? (statutCfg?.bg || t.bgPage) : t.bgPage,
+                    borderRadius: t.radiusMd,
+                    border: `1px solid ${collecte ? (statutCfg?.dot + '44') : t.border}`,
+                    opacity: collecte ? 1 : 0.75,
+                  }}>
+                    {/* Numéro d'ordre */}
+                    <div style={{
+                      width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                      background: collecte ? (statutCfg?.color || t.primary) : t.border,
+                      color: collecte ? '#fff' : t.textMuted,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: collecte ? 12 : 11, fontWeight: 700,
+                    }}>
+                      {collecte ? statutCfg?.label : i + 1}
+                    </div>
+
+                    {/* Infos */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontWeight: 600, fontSize: 13,
+                        color: collecte ? (statutCfg?.color || t.textPrimary) : t.textPrimary,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {c.nom}
+                      </div>
+                      <div style={{ fontSize: 11, color: t.textMuted }}>
+                        {c.heureDebut} – {c.heureFin}
+                        {collecte && (
+                          <span style={{ marginLeft: 6, color: statutCfg?.color }}>
+                            · scanné {new Date(collecte.heureCollecte).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

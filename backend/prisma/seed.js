@@ -14,7 +14,7 @@ async function main() {
     { cle: 'alerte_hors_marge', valeur: 'true', description: 'Envoyer une alerte pour les collectes hors marge' },
     { cle: 'alerte_incident', valeur: 'true', description: 'Envoyer une alerte pour les incidents' },
     { cle: 'alerte_manquant', valeur: 'true', description: 'Envoyer une alerte pour les collectes manquantes' },
-    { cle: 'heure_verif_manquant', valeur: '20:00', description: 'Heure de vérification des collectes manquantes (HH:MM)' },
+    { cle: 'heure_verif_manquant', valeur: '17:30', description: 'Heure de vérification des collectes manquantes (HH:MM)' },
     { cle: 'facteur_defaut_id', valeur: '', description: 'ID du facteur sélectionné par défaut au scan' },
     { cle: 'rapport_auto_actif', valeur: 'false', description: 'Activer les rapports automatiques journaliers' },
     { cle: 'rapport_heure', valeur: '07:00', description: 'Heure d\'envoi du rapport journalier (HH:MM)' },

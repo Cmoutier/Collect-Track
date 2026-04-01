@@ -81,4 +81,4 @@ function estJourCollecte(joursCollecte, date) {
   return joursCollecte.includes(jourISOParis(date));
 }
 
-module.exports = { calculerStatut, estJourCollecte, heureEnMinutesParis };
+module.exports = { calculerStatut, estJourCollecte, heureEnMinutesParis, jourISOParis };

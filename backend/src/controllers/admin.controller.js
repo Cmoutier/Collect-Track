@@ -73,7 +73,7 @@ exports.listClients = async (req, res) => {
     const clients = await prisma.client.findMany({
       where,
       include: { facteurDefaut: { select: { id: true, nom: true, prenom: true } } },
-      orderBy: { nom: 'asc' },
+      orderBy: [{ ordre: 'asc' }, { nom: 'asc' }],
     });
     res.json(clients);
   } catch (e) { res.status(500).json({ error: 'Erreur serveur' }); }
@@ -81,11 +81,13 @@ exports.listClients = async (req, res) => {
 
 exports.createClient = async (req, res) => {
   try {
-    const { nom, adresse, codePostal, ville, joursCollecte, heureDebut, heureFin, margeMinutes, facteurDefautId, notes } = req.body;
+    const { nom, adresse, codePostal, ville, joursCollecte, heureDebut, heureFin, margeMinutes, facteurDefautId, notes, ordre } = req.body;
     if (!nom || !adresse || !codePostal || !ville || !heureDebut || !heureFin) {
       return res.status(400).json({ error: 'Champs obligatoires manquants' });
     }
     const qrCode = genererCodeQR();
+    // Ordre par défaut : à la fin de la liste existante
+    const countClients = await prisma.client.count();
     const client = await prisma.client.create({
       data: {
         nom, adresse, codePostal, ville, qrCode,
@@ -94,6 +96,7 @@ exports.createClient = async (req, res) => {
         margeMinutes: margeMinutes || 15,
         facteurDefautId: facteurDefautId ? parseInt(facteurDefautId) : null,
         notes,
+        ordre: ordre !== undefined ? parseInt(ordre) : countClients,
       },
     });
     res.status(201).json(client);
@@ -103,7 +106,7 @@ exports.createClient = async (req, res) => {
 exports.updateClient = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { nom, adresse, codePostal, ville, joursCollecte, heureDebut, heureFin, margeMinutes, facteurDefautId, actif, notes } = req.body;
+    const { nom, adresse, codePostal, ville, joursCollecte, heureDebut, heureFin, margeMinutes, facteurDefautId, actif, notes, ordre } = req.body;
     const data = {};
     if (nom !== undefined) data.nom = nom;
     if (adresse !== undefined) data.adresse = adresse;
@@ -116,6 +119,7 @@ exports.updateClient = async (req, res) => {
     if (facteurDefautId !== undefined) data.facteurDefautId = facteurDefautId ? parseInt(facteurDefautId) : null;
     if (actif !== undefined) data.actif = actif;
     if (notes !== undefined) data.notes = notes;
+    if (ordre !== undefined) data.ordre = parseInt(ordre);
 
     const client = await prisma.client.update({ where: { id }, data });
     res.json(client);
