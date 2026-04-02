@@ -14,6 +14,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Statut système (pause) — accessible à tous les rôles
+router.get('/statut', auth, ctrl.statutSysteme);
+
 // Scan QR Code (tous les rôles authentifiés)
 router.post('/scan', auth, ctrl.scan);
 

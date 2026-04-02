@@ -2,6 +2,15 @@ const prisma = require('../lib/prisma');
 const { calculerStatut, estJourCollecte, heureEnMinutesParis } = require('../services/conformite.service');
 const alerteService = require('../services/alerte.service');
 
+exports.statutSysteme = async (req, res) => {
+  try {
+    const param = await prisma.parametre.findUnique({ where: { cle: 'systeme_en_pause' } });
+    res.json({ systemePause: param?.valeur === 'true' });
+  } catch (e) {
+    res.json({ systemePause: false });
+  }
+};
+
 exports.scan = async (req, res) => {
   try {
     const { qrCode, facteurId } = req.body;

@@ -40,11 +40,9 @@ export default function ScanPage() {
 
   const checkPause = async () => {
     try {
-      const { data } = await api.get('/admin/parametres');
-      const p = data.find((x) => x.cle === 'systeme_en_pause');
-      const paused = p?.valeur === 'true';
-      setSystemePause(paused);
-      return paused;
+      const { data } = await api.get('/collectes/statut');
+      setSystemePause(data.systemePause);
+      return data.systemePause;
     } catch {}
     return false;
   };
@@ -58,8 +56,6 @@ export default function ScanPage() {
         ]);
         const list = usersRes.data.filter((u) => u.role === 'facteur' && u.actif);
         setFacteurs(list);
-        const pauseParam = paramsRes.data.find((p) => p.cle === 'systeme_en_pause');
-        setSystemePause(pauseParam?.valeur === 'true');
         const defParam = paramsRes.data.find((p) => p.cle === 'facteur_defaut_id');
         const defId = defParam?.valeur ? parseInt(defParam.valeur) : null;
         setDefaultId(defId);
@@ -74,6 +70,7 @@ export default function ScanPage() {
     };
     init();
     fetchClientsJour();
+    checkPause();
     const interval = setInterval(checkPause, 30000);
     return () => clearInterval(interval);
   }, []);
