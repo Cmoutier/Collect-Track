@@ -54,7 +54,7 @@ collect-and-track/
 │   ├── .env / .env.example
 │   ├── prisma/
 │   │   ├── schema.prisma          # Modèles : User, Client, Collecte, Photo, Alerte, Tournee, TourneeClient, Parametre
-│   │   ├── seed.js                # Admin par défaut + 10 paramètres système
+│   │   ├── seed.js                # Admin par défaut + 11 paramètres système (dont systeme_en_pause)
 │   │   └── migrations/
 │   │       └── 20260401000000_add_client_ordre/migration.sql  # Ajout colonne ordre sur Client
 │   ├── uploads/                   # Photos uploadées (multer)
@@ -62,12 +62,14 @@ collect-and-track/
 │       ├── middlewares/
 │       │   ├── auth.js            # Vérifie JWT sur toutes les routes sauf /api/auth/login
 │       │   └── role.js            # Vérifie le rôle (admin / manager / facteur)
+│       ├── lib/
+│       │   └── prisma.js              # Singleton PrismaClient partagé (évite MaxClientsInSessionMode)
 │       ├── routes/                # auth, collectes, dashboard, admin, export
 │       ├── controllers/           # auth, collectes, dashboard, admin, export
 │       └── services/
 │           ├── conformite.service.js   # Calcul statut conforme/hors_marge/incident (exports: calculerStatut, estJourCollecte, heureEnMinutesParis, jourISOParis)
-│           ├── alerte.service.js       # Création alertes + envoi email groupé manquants
-│           ├── rapport.service.js      # Rapport journalier automatique
+│           ├── alerte.service.js       # Création alertes + envoi email groupé manquants (exports: creerAlerte, verifierCollectesManquantes, envoyerEmail)
+│           ├── rapport.service.js      # Rapport journalier automatique (utilise envoyerEmail d'alerte.service)
 │           └── qrcode.service.js       # Génération QR Code PNG/base64
 │
 └── frontend/
@@ -75,7 +77,8 @@ collect-and-track/
     ├── vite.config.js             # Proxy /api → localhost:3001 en dev
     ├── package.json               # build = vite build && cp dist/index.html dist/404.html
     ├── public/
-    │   └── _redirects             # /* /index.html 200 — SPA routing sur Render
+    │   ├── _redirects             # /* /index.html 200 — SPA routing sur Render
+    │   └── assets/collect-track-icon.svg  # Favicon de l'application
     └── src/
         ├── main.jsx
         ├── App.jsx                # Router, PrivateRoute, redirect selon rôle
@@ -112,8 +115,10 @@ collect-and-track/
 | Rôle | Accès |
 |------|-------|
 | `facteur` | Scan QR, tournée du jour, signaler incident |
-| `manager` | Dashboard, historique, export Excel, traiter alertes |
+| `manager` | Scan QR, tournée du jour, dashboard, historique, export Excel, traiter alertes |
 | `admin` | Tout + gestion utilisateurs / clients / paramètres système |
+
+> Le manager peut scanner pour remplacer un facteur. Il a accès aux pages `/scan`, `/tournee`, `/incident` en plus de ses pages habituelles.
 
 ---
 
@@ -161,6 +166,15 @@ Le statut `incident` peut être positionné de deux façons :
 
 Avant d'enregistrer un scan, le backend vérifie si le même client a déjà une collecte aujourd'hui. Si oui, retourne HTTP 409 avec `{ alreadyScanned: true, heureExistante }`. Le frontend propose une confirmation avant de forcer avec `{ force: true }`.
 
+### Mise en pause du système
+
+Le paramètre `systeme_en_pause` permet de suspendre entièrement le service :
+- **Backend** : les endpoints `/collectes/scan` et `/collectes/preview` retournent HTTP 503 `{ error: 'Système en pause', systemePause: true }`
+- **Crons** : `verifierCollectesManquantes` et `envoyerRapportJournalier` sont ignorés si le système est en pause
+- **Frontend facteur** : la zone scanner est remplacée par un écran "Service suspendu", le statut est vérifié toutes les 30 secondes + à chaque clic sur "Démarrer le scan"
+- **Frontend admin** : bandeau vert/rouge en haut de la page Admin avec bouton "Mettre en pause" / "Reprendre"
+- **Endpoint statut** : `GET /api/collectes/statut` retourne `{ systemePause }` — accessible à tous les rôles (facteur, manager, admin)
+
 ### Résolution d'alerte
 
 Quand un manager traite une alerte, il peut saisir un commentaire de résolution. Ce texte est sauvegardé dans `Collecte.notes` (préfixé `"Résolution : "`). Il apparaît automatiquement dans l'historique avec un bandeau vert.
@@ -169,13 +183,15 @@ Quand un manager traite une alerte, il peut saisir un commentaire de résolution
 
 ## Flux scan QR (page Scan.jsx)
 
-1. Facteur clique "Démarrer le scan" → caméra s'ouvre
-2. QR Code détecté → caméra s'arrête, appel `GET /collectes/preview?qrCode=xxx`
-3. Nom du client + plage horaire s'affichent → bouton "Confirmer le scan"
-4. Sur confirmation → `POST /collectes/scan`
+1. Vérification statut pause (`GET /collectes/statut`) — si pause active, écran "Service suspendu" affiché
+2. Facteur clique "Démarrer le scan" → vérification pause recheckée → caméra s'ouvre
+3. QR Code détecté → caméra s'arrête, appel `GET /collectes/preview?qrCode=xxx`
+4. Nom du client + plage horaire s'affichent → bouton "Confirmer le scan"
+5. Sur confirmation → `POST /collectes/scan`
+   - Si 503 (pause) → message "Système en pause"
    - Si 409 (doublon) → dialog de confirmation avant force
    - Si succès → résultat coloré (vert/orange/rouge) + heure Paris + plage attendue si non conforme
-5. La liste de tournée du jour se rafraîchit automatiquement après chaque scan
+6. La liste de tournée du jour se rafraîchit automatiquement après chaque scan
 
 ---
 
@@ -184,8 +200,9 @@ Quand un manager traite une alerte, il peut saisir un commentaire de résolution
 ### Collectes (`/api/collectes`)
 | Méthode | Route | Description |
 |---------|-------|-------------|
-| POST | `/scan` | Enregistrer un scan QR |
-| GET | `/preview?qrCode=xxx` | Infos client sans enregistrement (avant confirmation) |
+| GET | `/statut` | Statut système `{ systemePause }` — tous rôles |
+| POST | `/scan` | Enregistrer un scan QR — bloqué si pause (503) |
+| GET | `/preview?qrCode=xxx` | Infos client sans enregistrement — bloqué si pause (503) |
 | GET | `/tournee/today` | Clients du jour avec statut de scan (triés par ordre) |
 | PUT | `/:id/incident` | Marquer en incident |
 | DELETE | `/:id` | Supprimer une collecte (manager/admin) |
@@ -224,6 +241,7 @@ Quand un manager traite une alerte, il peut saisir un commentaire de résolution
 | `facteur_defaut_id` | — | ID facteur pré-sélectionné au scan |
 | `rapport_auto_actif` | `false` | Rapport journalier automatique — replanifié automatiquement à la sauvegarde |
 | `rapport_heure` | `07:00` | Heure envoi rapport journalier (HH:MM) — replanifié automatiquement à la sauvegarde |
+| `systeme_en_pause` | `false` | Met le système en pause (bloque scans, alertes et crons) |
 
 ---
 
@@ -293,6 +311,7 @@ Définie dans `frontend/src/styles/theme.js` :
 - **Bleu secondaire** `#1A4480` — couleur corporate STEP
 - **Police** : Inter (Google Fonts)
 - **Logo** : `frontend/src/assets/Logo vert - STEP POST - RVB.jpg` (importé en ES module dans Layout.jsx et Login.jsx)
+- **Favicon** : `frontend/public/assets/collect-track-icon.svg`
 
 ---
 
@@ -315,6 +334,10 @@ Définie dans `frontend/src/styles/theme.js` :
 | `rapport.service.js` avait son propre transporter sans timeout | Remplacé par appel à `envoyerEmail` d'`alerte.service.js` (timeouts inclus) |
 | Page clients admin vide (liste toujours 0) | Colonne `ordre` absente en base → requête Prisma `orderBy: [{ ordre }]` plantait silencieusement. Fix : `ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "ordre" INTEGER NOT NULL DEFAULT 0;` exécuté dans Supabase SQL Editor. **Attention** : les noms de tables Prisma sont en PascalCase (`"Client"`, `"User"`…) — toujours vérifier avec `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'` |
 | Erreur de chargement silencieuse dans `ClientsTab` | `fetchAll()` n'avait pas de `.catch()` → échec API muet, liste restait vide sans message. Corrigé : ajout `.catch()` + affichage de l'erreur dans l'UI |
+| `MaxClientsInSessionMode` sur Supabase au démarrage | 9 instances `new PrismaClient()` ouvertes simultanément. Corrigé : singleton `backend/src/lib/prisma.js` importé partout |
+| Bouton pause inactif (paramètre inexistant en base) | `updateParametre` utilisait `prisma.update` → échouait si clé absente. Corrigé : `prisma.upsert` crée la clé si elle n'existe pas |
+| Facteur voyait toujours le scanner en mode pause | `checkPause()` appelait `/admin/parametres` (403 pour facteur). Corrigé : nouvel endpoint `GET /collectes/statut` accessible à tous les rôles |
+| Header mobile : nom coupé + bouton déconnexion invisible | Nav trop large poussait le profil hors écran. Corrigé : sous 520px, labels masqués (icônes seules), nom masqué, bouton déconnexion toujours visible |
 
 ---
 
@@ -358,3 +381,5 @@ Au démarrage de Claude Code, une fenêtre de navigateur s'ouvre pour l'authenti
 - **`Client.ordre`** : ajouté via migration `20260401000000_add_client_ordre`. Définit l'ordre de passage dans la tournée.
 - **`Alerte`** : pas de champ `resolution` en base — la résolution manager est stockée dans `Collecte.notes` (préfixe `"Résolution : "`).
 - **Téléchargements authentifiés** : toujours utiliser `axios` avec `responseType: 'blob'` + `URL.createObjectURL()`, jamais `<a href>` direct (pas de JWT dans les headers).
+- **Singleton Prisma** : ne jamais créer `new PrismaClient()` dans un controller ou service — toujours importer `require('../lib/prisma')` (ou chemin relatif équivalent). Plusieurs instances = saturation du pool Supabase.
+- **`updateParametre` utilise `upsert`** : permet de créer un paramètre s'il n'existe pas encore en base (ex: `systeme_en_pause` ajouté après le déploiement initial).
