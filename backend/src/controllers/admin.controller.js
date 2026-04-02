@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const bcrypt = require('bcrypt');
 const { genererCodeQR, genererBufferQR } = require('../services/qrcode.service');
-
-const prisma = new PrismaClient();
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
 
 // ─── USERS ───────────────────────────────────────────────

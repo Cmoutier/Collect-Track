@@ -38,8 +38,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Dat
 
 // ─── CRON ────────────────────────────────────────────────────────────────────
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('./src/lib/prisma');
 
 // Références aux tâches cron actives (permettent de les stopper/replanifier)
 const cronTasks = { manquants: null, rapport: null };

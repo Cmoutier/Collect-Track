@@ -1,8 +1,6 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { calculerStatut, estJourCollecte, heureEnMinutesParis } = require('../services/conformite.service');
 const alerteService = require('../services/alerte.service');
-
-const prisma = new PrismaClient();
 
 exports.scan = async (req, res) => {
   try {

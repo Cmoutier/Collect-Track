@@ -1,7 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const ExcelJS = require('exceljs');
-
-const prisma = new PrismaClient();
 
 exports.exportExcel = async (req, res) => {
   try {
