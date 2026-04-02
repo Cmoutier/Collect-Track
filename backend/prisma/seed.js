@@ -18,6 +18,7 @@ async function main() {
     { cle: 'facteur_defaut_id', valeur: '', description: 'ID du facteur sélectionné par défaut au scan' },
     { cle: 'rapport_auto_actif', valeur: 'false', description: 'Activer les rapports automatiques journaliers' },
     { cle: 'rapport_heure', valeur: '07:00', description: 'Heure d\'envoi du rapport journalier (HH:MM)' },
+    { cle: 'systeme_en_pause', valeur: 'false', description: 'Mettre le système en pause (bloque les scans et les alertes)' },
   ];
 
   for (const p of parametres) {

@@ -5,6 +5,12 @@ const prisma = new PrismaClient();
 
 async function envoyerRapportJournalier() {
   try {
+    const pause = await prisma.parametre.findUnique({ where: { cle: 'systeme_en_pause' } });
+    if (pause?.valeur === 'true') {
+      console.log('[Rapport] Système en pause — rapport ignoré');
+      return;
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
@@ -35,7 +41,7 @@ async function envoyerRapportJournalier() {
     `;
 
     await envoyerEmail(`Rapport du ${yesterday.toLocaleDateString('fr-FR')}`, html);
-    console.log('[Rapport] Rapport journalier envoyé à', dest);
+    console.log('[Rapport] Rapport journalier envoyé');
   } catch (e) {
     console.error('[Rapport] Erreur:', e.message);
   }

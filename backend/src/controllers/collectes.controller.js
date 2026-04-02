@@ -9,6 +9,12 @@ exports.scan = async (req, res) => {
     const { qrCode, facteurId } = req.body;
     if (!qrCode) return res.status(400).json({ error: 'QR Code manquant' });
 
+    // Vérifier si le système est en pause
+    const pauseParam = await prisma.parametre.findUnique({ where: { cle: 'systeme_en_pause' } });
+    if (pauseParam?.valeur === 'true') {
+      return res.status(503).json({ error: 'Système en pause', systemePause: true });
+    }
+
     // Récupérer le client
     const client = await prisma.client.findUnique({
       where: { qrCode },

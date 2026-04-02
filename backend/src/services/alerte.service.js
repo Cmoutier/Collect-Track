@@ -84,6 +84,12 @@ async function creerAlerte(collecte, type) {
 
 async function verifierCollectesManquantes() {
   try {
+    const pause = await prisma.parametre.findUnique({ where: { cle: 'systeme_en_pause' } });
+    if (pause?.valeur === 'true') {
+      console.log('[Alerte] Système en pause — vérification manquants ignorée');
+      return;
+    }
+
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const jourISO = now.getDay() === 0 ? 7 : now.getDay();

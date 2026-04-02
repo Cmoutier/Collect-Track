@@ -29,6 +29,7 @@ export default function ScanPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [doublonInfo,    setDoublonInfo]    = useState(null);
   const [clientsJour,    setClientsJour]    = useState([]);
+  const [systemePause,   setSystemePause]   = useState(false);
 
   const fetchClientsJour = async () => {
     try {
@@ -46,6 +47,8 @@ export default function ScanPage() {
         ]);
         const list = usersRes.data.filter((u) => u.role === 'facteur' && u.actif);
         setFacteurs(list);
+        const pauseParam = paramsRes.data.find((p) => p.cle === 'systeme_en_pause');
+        setSystemePause(pauseParam?.valeur === 'true');
         const defParam = paramsRes.data.find((p) => p.cle === 'facteur_defaut_id');
         const defId = defParam?.valeur ? parseInt(defParam.valeur) : null;
         setDefaultId(defId);
@@ -135,6 +138,20 @@ export default function ScanPage() {
   return (
     <Layout title="Scanner une collecte">
       <div style={{ maxWidth: 480, margin: '0 auto', fontFamily: t.fontFamily }}>
+
+        {/* ── Bannière pause ── */}
+        {systemePause && (
+          <div style={{
+            background: t.dangerBg, border: `1.5px solid ${t.dangerBorder}`,
+            borderRadius: t.radiusLg, padding: '14px 16px', marginBottom: 16,
+            textAlign: 'center',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: t.danger }}>⏸ Système en pause</div>
+            <div style={{ fontSize: 13, color: t.textMuted, marginTop: 4 }}>
+              Le service de collecte est temporairement suspendu. Les scans ne sont pas enregistrés.
+            </div>
+          </div>
+        )}
 
         {/* ── Sélection facteur ── */}
         <div style={card}>

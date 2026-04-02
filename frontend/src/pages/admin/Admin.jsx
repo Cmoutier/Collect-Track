@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import UsersTab     from './tabs/UsersTab';
 import ClientsTab   from './tabs/ClientsTab';
 import ParametresTab from './tabs/ParametresTab';
+import api from '../../api/axios';
 import t from '../../styles/theme';
 
 const TABS = [
@@ -21,11 +22,60 @@ const TABS = [
 ];
 
 export default function AdminPage() {
-  const [tab, setTab] = useState('users');
+  const [tab,    setTab]    = useState('users');
+  const [pause,  setPause]  = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get('/admin/parametres').then((res) => {
+      const p = res.data.find((x) => x.cle === 'systeme_en_pause');
+      setPause(p?.valeur === 'true');
+    }).catch(() => {});
+  }, []);
+
+  const togglePause = async () => {
+    setSaving(true);
+    const newVal = !pause;
+    try {
+      await api.put('/admin/parametres/systeme_en_pause', { valeur: String(newVal) });
+      setPause(newVal);
+    } catch {}
+    finally { setSaving(false); }
+  };
 
   return (
     <Layout title="Administration">
       <div style={{ fontFamily: t.fontFamily }}>
+
+        {/* ── Bouton pause ── */}
+        <div style={{
+          background: pause ? t.dangerBg : t.successBg,
+          border: `1.5px solid ${pause ? t.dangerBorder : t.successBorder}`,
+          borderRadius: t.radiusLg,
+          padding: '12px 16px',
+          marginBottom: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: pause ? t.danger : t.success }}>
+              {pause ? '⏸ Système en pause' : '▶ Système actif'}
+            </div>
+            <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+              {pause
+                ? 'Les scans sont bloqués et les alertes désactivées.'
+                : 'Les scans et alertes fonctionnent normalement.'}
+            </div>
+          </div>
+          <button onClick={togglePause} disabled={saving} style={{
+            height: 38, padding: '0 20px',
+            border: 'none', borderRadius: t.radiusMd,
+            background: pause ? t.success : t.danger,
+            color: '#fff', fontWeight: 700, fontSize: 13,
+            cursor: 'pointer', flexShrink: 0,
+          }}>
+            {saving ? '…' : pause ? 'Reprendre' : 'Mettre en pause'}
+          </button>
+        </div>
 
         {/* ── Onglets ── */}
         <div style={{
