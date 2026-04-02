@@ -202,6 +202,13 @@ exports.updateParametre = async (req, res) => {
     const { valeur } = req.body;
     if (valeur === undefined) return res.status(400).json({ error: 'Valeur requise' });
     const param = await prisma.parametre.update({ where: { cle }, data: { valeur: String(valeur) } });
+
+    // Replanifier le cron si nécessaire
+    if (['heure_verif_manquant', 'rapport_heure', 'rapport_auto_actif'].includes(cle)) {
+      const { replanifierCron } = require('../../server');
+      await replanifierCron(cle);
+    }
+
     res.json(param);
   } catch (e) { res.status(500).json({ error: 'Erreur serveur' }); }
 };
