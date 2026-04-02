@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
 import t from '../styles/theme';
-import logoStepPost from '../assets/Logo vert - STEP POST - RVB.jpg';
+const logoCollectTrack = '/assets/collect-track-icon.svg';
 
 const NAV_FACTEUR  = [
   { path: '/scan',     icon: '⬡', label: 'Scanner'   },
@@ -94,7 +94,7 @@ export default function Layout({ children, title }) {
       }}>
 
         {/* Logo */}
-        <img src={logoStepPost} alt="STEP POST" style={{ height: 30, objectFit: 'contain', flexShrink: 0 }} />
+        <img src={logoCollectTrack} alt="Collect&Track" style={{ height: 32, width: 32, objectFit: 'contain', flexShrink: 0 }} />
 
         {/* Nav — centrée */}
         <nav style={{ flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'center', height: '100%' }}>
