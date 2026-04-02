@@ -62,12 +62,13 @@ export default function ParametresTab() {
   const handleTestEmail = async () => {
     setTestEmail({ loading: true, result: null });
     try {
-      await api.post('/admin/test-email');
+      await api.post('/admin/test-email', {}, { timeout: 20000 });
       setTestEmail({ loading: false, result: 'ok' });
     } catch (e) {
-      setTestEmail({ loading: false, result: e.response?.data?.error || 'Erreur envoi' });
+      const msg = e.code === 'ECONNABORTED' ? 'Délai dépassé — vérifiez la config SMTP' : e.response?.data?.error || 'Erreur envoi';
+      setTestEmail({ loading: false, result: msg });
     }
-    setTimeout(() => setTestEmail({ loading: false, result: null }), 5000);
+    setTimeout(() => setTestEmail({ loading: false, result: null }), 6000);
   };
 
   const handleSave = async (cle) => {
