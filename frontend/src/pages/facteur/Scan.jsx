@@ -178,6 +178,19 @@ export default function ScanPage() {
 
         {/* ── Zone scanner ── */}
         <div style={card}>
+          {systemePause && (
+            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>⏸</div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: t.danger, marginBottom: 8 }}>
+                Service suspendu
+              </div>
+              <div style={{ fontSize: 14, color: t.textMuted }}>
+                Le service de collecte est temporairement à l'arrêt.<br />
+                Contactez votre responsable pour plus d'informations.
+              </div>
+            </div>
+          )}
+          {!systemePause && (<>
           {/* Viewfinder QR */}
           <div
             id="qr-reader"
@@ -302,6 +315,7 @@ export default function ScanPage() {
               <div style={{ color: t.primary, fontWeight: 600, fontSize: 15 }}>Enregistrement…</div>
             </div>
           )}
+          </>)}
         </div>
 
         {/* ── Résultat ── */}

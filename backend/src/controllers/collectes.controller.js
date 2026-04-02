@@ -161,6 +161,10 @@ exports.uploadPhotos = async (req, res) => {
 
 exports.clientPreview = async (req, res) => {
   try {
+    const pauseParam = await prisma.parametre.findUnique({ where: { cle: 'systeme_en_pause' } });
+    if (pauseParam?.valeur === 'true') {
+      return res.status(503).json({ error: 'Système en pause', systemePause: true });
+    }
     const { qrCode } = req.query;
     if (!qrCode) return res.status(400).json({ error: 'QR Code manquant' });
     const client = await prisma.client.findUnique({
