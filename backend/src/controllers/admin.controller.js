@@ -167,6 +167,26 @@ exports.testEmail = async (req, res) => {
   }
 };
 
+exports.triggerManquants = async (req, res) => {
+  try {
+    const { verifierCollectesManquantes } = require('../services/alerte.service');
+    await verifierCollectesManquantes();
+    res.json({ message: 'Vérification manquants exécutée' });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Erreur' });
+  }
+};
+
+exports.triggerRapport = async (req, res) => {
+  try {
+    const { envoyerRapportJournalier } = require('../services/rapport.service');
+    await envoyerRapportJournalier();
+    res.json({ message: 'Rapport journalier envoyé' });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Erreur' });
+  }
+};
+
 // ─── PARAMÈTRES ──────────────────────────────────────────
 
 exports.listParametres = async (req, res) => {

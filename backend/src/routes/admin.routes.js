@@ -21,5 +21,7 @@ router.get('/clients/:id/qrcode', auth, role('admin', 'manager'), ctrl.getQrCode
 router.get('/parametres', auth, role('admin'), ctrl.listParametres);
 router.put('/parametres/:cle', auth, role('admin'), ctrl.updateParametre);
 router.post('/test-email', auth, role('admin'), ctrl.testEmail);
+router.post('/trigger/manquants', auth, role('admin'), ctrl.triggerManquants);
+router.post('/trigger/rapport', auth, role('admin'), ctrl.triggerRapport);
 
 module.exports = router;

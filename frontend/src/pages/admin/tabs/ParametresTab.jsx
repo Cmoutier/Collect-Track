@@ -47,7 +47,9 @@ export default function ParametresTab() {
   const [saving,    setSaving]    = useState({});
   const [vals,      setVals]      = useState({});
   const [saved,     setSaved]     = useState({});
-  const [testEmail, setTestEmail] = useState({ loading: false, result: null });
+  const [testEmail,      setTestEmail]      = useState({ loading: false, result: null });
+  const [triggerManq,    setTriggerManq]    = useState({ loading: false, result: null });
+  const [triggerRapport, setTriggerRapport] = useState({ loading: false, result: null });
 
   useEffect(() => {
     Promise.all([api.get('/admin/parametres'), api.get('/admin/users')]).then(([p, u]) => {
@@ -69,6 +71,18 @@ export default function ParametresTab() {
       setTestEmail({ loading: false, result: msg });
     }
     setTimeout(() => setTestEmail({ loading: false, result: null }), 6000);
+  };
+
+  const handleTrigger = async (type) => {
+    const setter = type === 'manquants' ? setTriggerManq : setTriggerRapport;
+    setter({ loading: true, result: null });
+    try {
+      await api.post(`/admin/trigger/${type}`, {}, { timeout: 30000 });
+      setter({ loading: false, result: 'ok' });
+    } catch (e) {
+      setter({ loading: false, result: e.response?.data?.error || 'Erreur' });
+    }
+    setTimeout(() => setter({ loading: false, result: null }), 6000);
   };
 
   const handleSave = async (cle) => {
@@ -109,8 +123,7 @@ export default function ParametresTab() {
 
             {/* Paramètres du groupe */}
             <div style={{ padding: '4px 0' }}>
-              {group.keys.map((cle, idx) => {
-                const p = paramMap[cle];
+              {group.keys.map((cle, idx) => {                const p = paramMap[cle];
                 if (!p) return null;
                 const isBool = BOOL_PARAMS.includes(cle);
                 const isLast = idx === group.keys.length - 1;
@@ -203,6 +216,20 @@ export default function ParametresTab() {
                   </div>
                 );
               })}
+              {group.label === 'Alertes email' && (
+                <div style={{ padding: '12px 16px', borderTop: `1px solid ${t.borderLight}`, display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleTrigger('manquants')} disabled={triggerManq.loading} style={btnTrigger(triggerManq.result)}>
+                    {triggerManq.loading ? '…' : triggerManq.result === 'ok' ? '✓ Email envoyé' : triggerManq.result ? '✗ Échec' : 'Envoyer manquants maintenant'}
+                  </button>
+                </div>
+              )}
+              {group.label === 'Rapport journalier' && (
+                <div style={{ padding: '12px 16px', borderTop: `1px solid ${t.borderLight}`, display: 'flex', gap: 8 }}>
+                  <button onClick={() => handleTrigger('rapport')} disabled={triggerRapport.loading} style={btnTrigger(triggerRapport.result)}>
+                    {triggerRapport.loading ? '…' : triggerRapport.result === 'ok' ? '✓ Rapport envoyé' : triggerRapport.result ? '✗ Échec' : 'Envoyer le rapport maintenant'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -210,6 +237,14 @@ export default function ParametresTab() {
     </div>
   );
 }
+
+const btnTrigger = (result) => ({
+  height: 36, padding: '0 16px',
+  border: 'none', borderRadius: t.radiusMd,
+  background: result === 'ok' ? t.success : result ? t.danger : t.secondary,
+  color: '#fff', fontWeight: 700, fontSize: 13,
+  cursor: 'pointer', transition: 'background 0.3s',
+});
 
 const inputS = {
   flex: 1, height: 38, padding: '0 12px',
