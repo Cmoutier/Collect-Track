@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../store/useAuthStore';
 import t from '../styles/theme';
@@ -68,7 +68,13 @@ export default function Layout({ children, title }) {
   const { user, logout } = useAuthStore();
   const navigate  = useNavigate();
   const location  = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [narrow, setNarrow] = useState(window.innerWidth < 520);
+
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 520);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const navItems = user?.role === 'facteur' ? NAV_FACTEUR
     : user?.role === 'manager'  ? NAV_MANAGER
@@ -98,13 +104,13 @@ export default function Layout({ children, title }) {
         <img src={logoStepPost} alt="STEP POST" style={{ height: 30, objectFit: 'contain', flexShrink: 0 }} />
 
         {/* Nav — centrée */}
-        <nav style={{ flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'center', height: '100%' }}>
+        <nav style={{ flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'center', height: '100%', minWidth: 0 }}>
           {navItems.map((item) => {
             const active = location.pathname === item.path;
             return (
               <Link key={item.path} to={item.path} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '0 14px',
+                display: 'flex', alignItems: 'center', gap: narrow ? 0 : 6,
+                padding: narrow ? '0 10px' : '0 14px',
                 textDecoration: 'none',
                 color: active ? '#fff' : 'rgba(255,255,255,0.65)',
                 fontWeight: active ? 700 : 500,
@@ -114,7 +120,7 @@ export default function Layout({ children, title }) {
                 transition: 'color 0.15s, border-color 0.15s',
               }}>
                 <span style={{ display: 'flex', flexShrink: 0 }}>{NAV_ICONS[item.path]}</span>
-                {item.label}
+                {!narrow && item.label}
               </Link>
             );
           })}
@@ -122,12 +128,14 @@ export default function Layout({ children, title }) {
 
         {/* Profil + déconnexion */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, opacity: 0.85, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {user?.prenom} {user?.nom}
-          </span>
+          {!narrow && (
+            <span style={{ fontSize: 12, opacity: 0.85, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.prenom} {user?.nom}
+            </span>
+          )}
           <button onClick={handleLogout} title="Déconnexion" style={{
-            background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff',
-            width: 32, height: 32, borderRadius: t.radiusMd,
+            background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.4)',
+            color: '#fff', width: 34, height: 34, borderRadius: t.radiusMd,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 16, flexShrink: 0,
           }}>
