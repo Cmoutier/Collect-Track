@@ -214,5 +214,8 @@ exports.updateParametre = async (req, res) => {
     }
 
     res.json(param);
-  } catch (e) { res.status(500).json({ error: 'Erreur serveur' }); }
+  } catch (e) {
+    console.error('[updateParametre]', e.message);
+    res.status(500).json({ error: e.message || 'Erreur serveur' });
+  }
 };
