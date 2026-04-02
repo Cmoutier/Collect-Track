@@ -38,6 +38,17 @@ export default function ScanPage() {
     } catch {}
   };
 
+  const checkPause = async () => {
+    try {
+      const { data } = await api.get('/admin/parametres');
+      const p = data.find((x) => x.cle === 'systeme_en_pause');
+      const paused = p?.valeur === 'true';
+      setSystemePause(paused);
+      return paused;
+    } catch {}
+    return false;
+  };
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -63,9 +74,13 @@ export default function ScanPage() {
     };
     init();
     fetchClientsJour();
+    const interval = setInterval(checkPause, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const startScanner = async () => {
+    const paused = await checkPause();
+    if (paused) return;
     setResult(null); setError('');
     setScanning(true);
     try {
