@@ -9,7 +9,8 @@ const NAV_FACTEUR  = [
   { path: '/tournee',  icon: '◎', label: 'Tournée'   },
 ];
 const NAV_MANAGER  = [
-  { path: '/dashboard',  icon: '⬡', label: 'Dashboard' },
+  { path: '/scan',       icon: '⬡', label: 'Scanner'    },
+  { path: '/dashboard',  icon: '⬡', label: 'Dashboard'  },
   { path: '/historique', icon: '◎', label: 'Historique' },
 ];
 const NAV_ADMIN = [
