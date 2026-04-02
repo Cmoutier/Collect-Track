@@ -19,12 +19,12 @@ const PARAM_GROUPS = [
   {
     label: 'Horaires & conformité',
     icon: '🕐',
-    keys: ['marge_defaut_minutes', 'heure_verif_manquant'],
+    keys: ['marge_defaut_minutes'],
   },
   {
     label: 'Alertes email',
     icon: '📧',
-    keys: ['alerte_email_active', 'alerte_email_dest', 'alerte_hors_marge', 'alerte_incident', 'alerte_manquant'],
+    keys: ['alerte_email_active', 'alerte_email_dest', 'alerte_hors_marge', 'alerte_incident', 'alerte_manquant', 'heure_verif_manquant'],
   },
   {
     label: 'Rapport journalier',
