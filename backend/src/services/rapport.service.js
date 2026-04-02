@@ -1,24 +1,10 @@
 const { PrismaClient } = require('@prisma/client');
-const nodemailer = require('nodemailer');
+const { envoyerEmail } = require('./alerte.service');
 
 const prisma = new PrismaClient();
 
-async function getParam(cle) {
-  const p = await prisma.parametre.findUnique({ where: { cle } });
-  return p?.valeur;
-}
-
 async function envoyerRapportJournalier() {
   try {
-    const dest = await getParam('alerte_email_dest');
-    if (!dest || !dest.trim()) return;
-
-    const destinataires = dest
-      .split(/[,;]/)
-      .map((e) => e.trim())
-      .filter(Boolean);
-    if (destinataires.length === 0) return;
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
@@ -48,20 +34,7 @@ async function envoyerRapportJournalier() {
       </table>
     `;
 
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: false,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'Collect&Track <noreply@collectandtrack.fr>',
-      to: destinataires.join(', '),
-      subject: `[Collect&Track] Rapport du ${yesterday.toLocaleDateString('fr-FR')}`,
-      html,
-    });
-
+    await envoyerEmail(`Rapport du ${yesterday.toLocaleDateString('fr-FR')}`, html);
     console.log('[Rapport] Rapport journalier envoyé à', dest);
   } catch (e) {
     console.error('[Rapport] Erreur:', e.message);
