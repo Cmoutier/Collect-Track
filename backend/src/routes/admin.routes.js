@@ -20,5 +20,6 @@ router.get('/clients/:id/qrcode', auth, role('admin', 'manager'), ctrl.getQrCode
 // Paramètres
 router.get('/parametres', auth, role('admin'), ctrl.listParametres);
 router.put('/parametres/:cle', auth, role('admin'), ctrl.updateParametre);
+router.post('/test-email', auth, role('admin'), ctrl.testEmail);
 
 module.exports = router;

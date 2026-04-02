@@ -150,4 +150,4 @@ async function verifierCollectesManquantes() {
   }
 }
 
-module.exports = { creerAlerte, verifierCollectesManquantes };
+module.exports = { creerAlerte, verifierCollectesManquantes, envoyerEmail };

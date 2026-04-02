@@ -147,6 +147,26 @@ exports.getQrCode = async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Erreur serveur' }); }
 };
 
+// ─── TEST EMAIL ──────────────────────────────────────────
+
+exports.testEmail = async (req, res) => {
+  try {
+    const { envoyerEmail } = require('../services/alerte.service');
+    const now = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
+    await envoyerEmail(
+      'Email de test Collect&Track',
+      `<div style="font-family:Arial,sans-serif;max-width:600px">
+        <h2 style="color:#2B6E44">Test de configuration email</h2>
+        <p>Cet email confirme que la configuration SMTP de <strong>Collect&amp;Track</strong> fonctionne correctement.</p>
+        <p style="color:#666;font-size:13px">Envoyé le ${now}</p>
+      </div>`
+    );
+    res.json({ message: 'Email de test envoyé' });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Erreur envoi email' });
+  }
+};
+
 // ─── PARAMÈTRES ──────────────────────────────────────────
 
 exports.listParametres = async (req, res) => {

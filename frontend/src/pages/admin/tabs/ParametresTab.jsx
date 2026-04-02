@@ -41,12 +41,13 @@ const PARAM_GROUPS = [
 const BOOL_PARAMS = ['alerte_email_active', 'alerte_hors_marge', 'alerte_incident', 'alerte_manquant', 'rapport_auto_actif'];
 
 export default function ParametresTab() {
-  const [params,   setParams]   = useState([]);
-  const [facteurs, setFacteurs] = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState({});
-  const [vals,     setVals]     = useState({});
-  const [saved,    setSaved]    = useState({});
+  const [params,    setParams]    = useState([]);
+  const [facteurs,  setFacteurs]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [saving,    setSaving]    = useState({});
+  const [vals,      setVals]      = useState({});
+  const [saved,     setSaved]     = useState({});
+  const [testEmail, setTestEmail] = useState({ loading: false, result: null });
 
   useEffect(() => {
     Promise.all([api.get('/admin/parametres'), api.get('/admin/users')]).then(([p, u]) => {
@@ -57,6 +58,17 @@ export default function ParametresTab() {
       setFacteurs(u.data.filter((u) => u.role === 'facteur' && u.actif));
     }).finally(() => setLoading(false));
   }, []);
+
+  const handleTestEmail = async () => {
+    setTestEmail({ loading: true, result: null });
+    try {
+      await api.post('/admin/test-email');
+      setTestEmail({ loading: false, result: 'ok' });
+    } catch (e) {
+      setTestEmail({ loading: false, result: e.response?.data?.error || 'Erreur envoi' });
+    }
+    setTimeout(() => setTestEmail({ loading: false, result: null }), 5000);
+  };
 
   const handleSave = async (cle) => {
     setSaving((s) => ({ ...s, [cle]: true }));
@@ -136,13 +148,33 @@ export default function ParametresTab() {
                           ))}
                         </select>
                       ) : cle === 'alerte_email_dest' ? (
-                        <input
-                          type="text"
-                          value={vals[cle] || ''}
-                          onChange={(e) => setVals((v) => ({ ...v, [cle]: e.target.value }))}
-                          placeholder="chef@laposte.fr, manager@laposte.fr"
-                          style={inputS}
-                        />
+                        <>
+                          <input
+                            type="text"
+                            value={vals[cle] || ''}
+                            onChange={(e) => setVals((v) => ({ ...v, [cle]: e.target.value }))}
+                            placeholder="chef@laposte.fr, manager@laposte.fr"
+                            style={inputS}
+                          />
+                          <button
+                            onClick={handleTestEmail}
+                            disabled={testEmail.loading}
+                            title="Envoyer un email de test aux destinataires configurés"
+                            style={{
+                              height: 38, padding: '0 14px',
+                              border: `1.5px solid ${t.secondary}`,
+                              borderRadius: t.radiusMd,
+                              background: testEmail.result === 'ok' ? t.success : testEmail.result ? t.danger : '#fff',
+                              color: testEmail.result ? '#fff' : t.secondary,
+                              fontWeight: 700, fontSize: 13,
+                              cursor: 'pointer', flexShrink: 0,
+                              transition: 'background 0.3s',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {testEmail.loading ? '…' : testEmail.result === 'ok' ? '✓ Envoyé' : testEmail.result ? '✗ Échec' : 'Tester'}
+                          </button>
+                        </>
                       ) : (
                         <input
                           type="text"

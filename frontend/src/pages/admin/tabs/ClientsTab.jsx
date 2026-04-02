@@ -22,11 +22,13 @@ export default function ClientsTab() {
 
   const fetchAll = () => {
     setLoading(true);
+    setError('');
     Promise.all([api.get('/admin/clients'), api.get('/admin/users')])
       .then(([c, u]) => {
         setClients(c.data);
         setFacteurs(u.data.filter((u) => u.role === 'facteur' && u.actif));
       })
+      .catch((e) => setError(e.response?.data?.error || 'Erreur lors du chargement des clients'))
       .finally(() => setLoading(false));
   };
   useEffect(() => { fetchAll(); }, []);
@@ -134,6 +136,8 @@ export default function ClientsTab() {
       <input type="text" placeholder="Rechercher par nom ou ville…" value={search}
         onChange={(e) => setSearch(e.target.value)}
         style={{ ...inputS, marginBottom: 12, background: '#fff' }} />
+
+      {error && !form && <div style={errorBox}>{error}</div>}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 32, color: t.textMuted }}>Chargement…</div>

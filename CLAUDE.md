@@ -302,6 +302,42 @@ Définie dans `frontend/src/styles/theme.js` :
 | Schéma Prisma modifié sans migration → colonnes manquantes en DB | Ne pas modifier `schema.prisma` sans créer un fichier dans `prisma/migrations/` |
 | QR Code téléchargé sans nom client | Canvas frontend : QR PNG + nom du client dessiné en dessous avant export |
 | Email manquants : un mail par client | Regroupé en un seul email récapitulatif HTML avec tableau des clients non scannés |
+| Page clients admin vide (liste toujours 0) | Colonne `ordre` absente en base → requête Prisma `orderBy: [{ ordre }]` plantait silencieusement. Fix : `ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "ordre" INTEGER NOT NULL DEFAULT 0;` exécuté dans Supabase SQL Editor. **Attention** : les noms de tables Prisma sont en PascalCase (`"Client"`, `"User"`…) — toujours vérifier avec `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'` |
+| Erreur de chargement silencieuse dans `ClientsTab` | `fetchAll()` n'avait pas de `.catch()` → échec API muet, liste restait vide sans message. Corrigé : ajout `.catch()` + affichage de l'erreur dans l'UI |
+
+---
+
+## MCP Supabase
+
+Le serveur MCP Supabase est configuré pour permettre à Claude Code d'interagir directement avec la base de données.
+
+### Fichiers de configuration
+
+- **`.mcp.json`** (racine du projet) : déclare le serveur MCP
+  ```json
+  { "mcpServers": { "supabase": { "url": "https://mcp.supabase.com/mcp" } } }
+  ```
+- **`~/.claude/settings.json`** (global) : `"enabledMcpjsonServers": ["supabase"]` pour approuver automatiquement le serveur
+
+### Activation
+
+Au démarrage de Claude Code, une fenêtre de navigateur s'ouvre pour l'authentification OAuth Supabase. Se connecter et choisir l'organisation du projet `iraootvkkpmrhbzglvta`.
+
+### Capacités disponibles via MCP
+
+- Lire/écrire la base de données directement
+- Lancer des migrations SQL
+- Exécuter des requêtes arbitraires
+- Consulter les logs (API, Postgres, Auth…)
+- Accéder aux advisors sécurité/performance
+
+---
+
+## Déploiement GitHub → Render
+
+- **Repo** : `https://github.com/Cmoutier/Collect-Track.git` (branche `master`)
+- Un `git push origin master` déclenche le redéploiement automatique sur Render si les services sont connectés au repo
+- Connecter un service : Render Dashboard → service → Settings → Build & Deploy → Connected Repository
 
 ---
 
