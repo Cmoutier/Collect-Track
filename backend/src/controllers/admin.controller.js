@@ -201,7 +201,11 @@ exports.updateParametre = async (req, res) => {
     const { cle } = req.params;
     const { valeur } = req.body;
     if (valeur === undefined) return res.status(400).json({ error: 'Valeur requise' });
-    const param = await prisma.parametre.update({ where: { cle }, data: { valeur: String(valeur) } });
+    const param = await prisma.parametre.upsert({
+      where: { cle },
+      update: { valeur: String(valeur) },
+      create: { cle, valeur: String(valeur) },
+    });
 
     // Replanifier le cron si nécessaire
     if (['heure_verif_manquant', 'rapport_heure', 'rapport_auto_actif'].includes(cle)) {

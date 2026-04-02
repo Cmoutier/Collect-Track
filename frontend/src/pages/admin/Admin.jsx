@@ -39,8 +39,9 @@ export default function AdminPage() {
     try {
       await api.put('/admin/parametres/systeme_en_pause', { valeur: String(newVal) });
       setPause(newVal);
-    } catch {}
-    finally { setSaving(false); }
+    } catch (e) {
+      alert(e.response?.data?.error || 'Erreur lors du changement d\'état');
+    } finally { setSaving(false); }
   };
 
   return (
