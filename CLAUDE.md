@@ -191,6 +191,15 @@ Quand un manager traite une alerte, il peut saisir un commentaire de résolution
 | DELETE | `/:id` | Supprimer une collecte (manager/admin) |
 | POST | `/:id/photos` | Upload photos |
 
+### Admin (`/api/admin`) — endpoints supplémentaires
+| Méthode | Route | Description |
+|---------|-------|-------------|
+| POST | `/test-email` | Envoie un email de test aux destinataires configurés |
+| POST | `/trigger/manquants` | Déclenche immédiatement la vérification des manquants |
+| POST | `/trigger/rapport` | Envoie immédiatement le rapport journalier |
+
+> Ces trois endpoints ont des boutons dédiés dans l'interface admin (onglet Paramètres).
+
 ### Dashboard (`/api/dashboard`)
 | Méthode | Route | Description |
 |---------|-------|-------------|
@@ -207,14 +216,14 @@ Quand un manager traite une alerte, il peut saisir un commentaire de résolution
 |-----|--------|-------------|
 | `marge_defaut_minutes` | `15` | Marge horaire par défaut (minutes) |
 | `alerte_email_active` | `true` | Activer les alertes email |
-| `alerte_email_dest` | — | Destinataires alertes (virgule ou point-virgule) |
+| `alerte_email_dest` | — | Destinataires alertes (virgule ou point-virgule) — bouton **Tester** pour valider la config SMTP |
 | `alerte_hors_marge` | `true` | Alerter pour hors marge |
 | `alerte_incident` | `true` | Alerter pour incident |
 | `alerte_manquant` | `true` | Alerter pour collecte manquante |
-| `heure_verif_manquant` | `17:30` | Heure cron vérification manquants — **à changer en admin si déjà installé** |
+| `heure_verif_manquant` | `17:30` | Heure cron vérification manquants — replanifié automatiquement à la sauvegarde |
 | `facteur_defaut_id` | — | ID facteur pré-sélectionné au scan |
-| `rapport_auto_actif` | `false` | Rapport journalier automatique |
-| `rapport_heure` | `07:00` | Heure envoi rapport journalier (HH:MM) |
+| `rapport_auto_actif` | `false` | Rapport journalier automatique — replanifié automatiquement à la sauvegarde |
+| `rapport_heure` | `07:00` | Heure envoi rapport journalier (HH:MM) — replanifié automatiquement à la sauvegarde |
 
 ---
 
@@ -229,12 +238,12 @@ JWT_EXPIRES_IN=24h
 BCRYPT_SALT_ROUNDS=12
 PORT=3001
 FRONTEND_URL=https://collect-track-frontend.onrender.com
-SMTP_HOST=smtp.gmail.com
+SMTP_HOST=ex.mail.ovh.net
 SMTP_PORT=587
-SMTP_USER=...
-SMTP_PASS=...
-SMTP_FROM=STEP POST <noreply@steppost.fr>
-ALERTE_EMAIL_DEST=manager@steppost.fr
+SMTP_USER=cmoutier@step.eco
+SMTP_PASS=<mot_de_passe_email>
+SMTP_FROM=STEP POST <cmoutier@step.eco>
+ALERTE_EMAIL_DEST=cmoutier@step.eco
 ```
 
 ### Frontend (Render Static Site)
@@ -302,6 +311,8 @@ Définie dans `frontend/src/styles/theme.js` :
 | Schéma Prisma modifié sans migration → colonnes manquantes en DB | Ne pas modifier `schema.prisma` sans créer un fichier dans `prisma/migrations/` |
 | QR Code téléchargé sans nom client | Canvas frontend : QR PNG + nom du client dessiné en dessous avant export |
 | Email manquants : un mail par client | Regroupé en un seul email récapitulatif HTML avec tableau des clients non scannés |
+| Cron ne prenait pas en compte les changements d'heure sans redémarrage | `server.js` expose `replanifierCron(cle)` — `updateParametre` l'appelle automatiquement pour `heure_verif_manquant`, `rapport_heure`, `rapport_auto_actif` |
+| `rapport.service.js` avait son propre transporter sans timeout | Remplacé par appel à `envoyerEmail` d'`alerte.service.js` (timeouts inclus) |
 | Page clients admin vide (liste toujours 0) | Colonne `ordre` absente en base → requête Prisma `orderBy: [{ ordre }]` plantait silencieusement. Fix : `ALTER TABLE "Client" ADD COLUMN IF NOT EXISTS "ordre" INTEGER NOT NULL DEFAULT 0;` exécuté dans Supabase SQL Editor. **Attention** : les noms de tables Prisma sont en PascalCase (`"Client"`, `"User"`…) — toujours vérifier avec `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'` |
 | Erreur de chargement silencieuse dans `ClientsTab` | `fetchAll()` n'avait pas de `.catch()` → échec API muet, liste restait vide sans message. Corrigé : ajout `.catch()` + affichage de l'erreur dans l'UI |
 
